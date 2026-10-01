@@ -69,3 +69,13 @@ MicPriority 通过只读蓝牙元数据和 SayAll 运行状态判断 MiRemoteV �
 用户反馈单选圆点不好看，要求只标记当前输入。移除 InputRadio 的全部 UI 和桥接代码，改为仅实际系统默认输入显示 SF Symbols 勾与柔和青绿底色；其他行没有空圈或占位符。状态未知时不标记旧输入。图标表示“当前系统输入”，不声称正在录音。原输入名称仍是切换入口，排序与临时选择行为不变。
 
 0.2.1 浅色/深色四输入面板已确认：只有当前默认输入出现淡青绿底勾，其他三行无空圈或标记；界面无溢出。发布构建与签名完成，核心路由检查和临时选择控制器检查在本次迭代中通过。
+
+### 首次公开发行与 README（v0.2.1）
+
+默认 README 为中文，英文位于 README.en.md。加入版本、macOS、通用架构和 MIT 徽章。截图 docs/assets/screenshot-macos.png 经用户授权，使用 macOS screencapture 只捕获当前正在运行的 MicPriority 浮窗（340 × 428 pt，680 × 856 px），保留真实设备顺序与自动切换状态；没有用离屏预览代替真实截图。
+
+本机没有有效 Developer ID 身份，因此公开包采用 ad-hoc 签名，不包含 Apple 公证。安装说明使用 Apple 官方的“隐私与安全性 → 仍要打开”流程，不要求关闭 Gatekeeper 或批量删除隔离属性。
+
+build.sh 支持 native 与 universal；通用构建包含 arm64 与 x86_64。当前仍仅有 Apple Silicon 的实机环境，不把交叉构建或 Rosetta 执行当作 Intel 实机验证。
+
+通用制品校验：arm64 与 x86_64 两个切片均存在，最低系统版本均为 13.0；签名完整性通过，确认为 ad-hoc。Apple Silicon 原生控制器完整流程与 RoutingChecks 通过；Intel 切片在已安装的 Rosetta 下启动并读取设备成功，不等同于 Intel 真机验收。
