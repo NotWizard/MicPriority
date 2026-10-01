@@ -120,7 +120,7 @@ final class InputController: ObservableObject {
     func stateText(_ uid: String) -> String {
         guard snapshotAvailable else { return "状态未知" }
         guard let input = input(uid) else { return "离线" }
-        if input.issue != nil { return "状态未知" }
+        if let issue = input.issue { return issue }
         if input.alive != true { return "离线" }
         if protection.excluded(at: Date()).contains(uid) { return "暂不可用" }
         return input.isAvailable ? "在线" : "不支持默认输入"
@@ -245,7 +245,7 @@ final class InputController: ObservableObject {
             "\(hash($0.uid)) · \(transportText($0)) · channels=\($0.channels) · available=\($0.isAvailable) · excluded=\(protection.excluded(at: Date()).contains($0.uid))"
         }
         let failure = lastSwitchFailure.map { "\(hash($0.uid)): \($0.message)" } ?? "none"
-        let text = (["MicPriority 0.1.0", ProcessInfo.processInfo.operatingSystemVersionString,
+        let text = (["MicPriority 0.1.1", ProcessInfo.processInfo.operatingSystemVersionString,
                      "automatic=\(preferences.automaticEnabled), temporary=\(temporary != nil)",
                      "current=\(hash(snapshot.defaultUID))", "lastReason=\(lastReason)",
                      "issue=\(issue ?? "none")", "lastFailure=\(failure)"] + rows).joined(separator: "\n")

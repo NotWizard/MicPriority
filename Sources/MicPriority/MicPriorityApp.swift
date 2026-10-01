@@ -11,8 +11,11 @@ enum Launcher {
             listInputs()
             return
         }
-        if CommandLine.arguments.contains("--check-controller") {
-            do { try ControllerChecks.run() }
+        if CommandLine.arguments.contains("--check-controller") || CommandLine.arguments.contains("--check-dji-flow") {
+            do {
+                if CommandLine.arguments.contains("--check-dji-flow") { try ControllerChecks.runDJI() }
+                else { try ControllerChecks.run() }
+            }
             catch {
                 FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
                 exit(1)
@@ -38,7 +41,15 @@ enum Launcher {
 
     private static func listInputs() {
         do {
-            let snapshot = try AudioDevices().currentSnapshot()
+            let audio = AudioDevices()
+            audio.start { _, _ in }
+            defer { audio.stop() }
+            let deadline = Date().addingTimeInterval(3)
+            var snapshot = try audio.currentSnapshot()
+            repeat {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+                snapshot = try audio.currentSnapshot()
+            } while snapshot.inputs.contains(where: { $0.issue == "正在检测发射器" }) && Date() < deadline
             let result: [String: Any] = [
                 "defaultInput": snapshot.defaultName ?? "none",
                 "inputs": snapshot.inputs.map { input -> [String: Any] in
@@ -77,7 +88,7 @@ enum Launcher {
             let controller = InputController(defaults: defaults)
             defer { controller.stop() }
             let deadline = Date().addingTimeInterval(3)
-            while !controller.snapshotAvailable && Date() < deadline {
+            while (!controller.snapshotAvailable || controller.snapshot.inputs.contains(where: { $0.issue == "正在检测发射器" })) && Date() < deadline {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.02))
             }
             guard controller.snapshotAvailable else { throw AudioFailure("No live snapshot for preview") }

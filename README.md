@@ -1,6 +1,6 @@
 # MicPriority · 麦克风优先级
 
-原生 macOS 菜单栏工具。保存输入设备的优先级，在设备断开或系统明确报告不可用时自动选择下一支；较高优先级输入恢复稳定后再切回。使用 SwiftUI、Core Audio 和系统登录项 API，无第三方依赖，不采集或保存音频。
+原生 macOS 菜单栏工具。保存输入设备的优先级，在设备断开或确认不可用时自动选择下一支；较高优先级输入恢复稳定后再切回。使用 SwiftUI、Core Audio、IOUSBHost 和系统登录项 API，无第三方依赖，不采集或保存音频。
 
 ## 构建和启动
 
@@ -66,8 +66,18 @@ dist/MicPriority.app/Contents/MacOS/MicPriority --list-inputs
 
 `Sources/MicPriorityCore` 封装 HAL 设备元数据、属性监听、写入操作和可独立运行检查的选择规则。`Sources/MicPriority` 提供菜单栏场景、UI 与事件控制器。HAL 操作在串行队列执行，界面更新在主线程进行。写入只操作默认输入属性，使用监听加读回确认；有限重试后临时排除失败设备，恢复检查仍失败时等重新连接或用户重试。睡眠唤醒及服务重启会重新枚举并重建监听。
 
-该工具修改系统默认输入。固定使用某支设备的应用可能不跟随；选择系统默认的应用也需验证是否支持会话内迁移。接收器仍在线但无线发射器没电或失联时，系统可能仍报告它可用。音量小、静音和没有说话不作为切换条件。蓝牙设备可能因输入选择改变通信模式，需要实际检查音质体验。
+该工具修改系统默认输入。固定使用某支设备的应用可能不跟随；选择系统默认的应用也需验证是否支持会话内迁移。DJI Mic Mini / Mic Mini 2 接收器（USB `2ca3:4011`、v2 状态协议）额外读取发射器连接标志：没有已连接且未充电的发射器时自动跳过接收器；状态不可读或超过 2 秒没有有效包时也跳过。连接恢复后沿用 2 秒稳定等待。仅访问厂家状态接口的 IN 端点，不发送设置命令、不打开音频采集、不抢占接口。身份通过 USB 序列号和系统 UID 在本地匹配。旧协议或未知固件尚不支持，显示检测失败并使用下一候选。其他无线接收器仍受系统元数据能力限制。音量小、静音和没有说话不作为切换条件。蓝牙设备可能因输入选择改变通信模式，需要实际检查音质体验。
 
 默认时间参数是恢复等待 2 秒、确认时限 1.5 秒、临时使用 1800 秒。硬件校准可通过 `defaults write com.local.MicPriority recoveryDelaySeconds -float 2` 等设置，修改后重启应用。另两项键名为 `confirmationTimeoutSeconds`、`temporaryDurationSeconds`；非有限或越界数值会被回退或限制在合理范围内。
 
-完整产品规则保存在 `docs/implementation-plan.md`。物理拔插、无线发射器失联和目标会议软件真实收音的验证需要实际硬件操作，不能用元数据检查代替。
+完整产品规则保存在 `docs/implementation-plan.md`。DJI 专用协议参考 [DJI Mic Control](https://github.com/ShadowBitBasher/DJI-Mic-Control/blob/main/PROTOCOL.md) 和 [MicShift 互操作记录](https://github.com/dvnkshl/MicShift/blob/main/DJI_USB_CAPABILITIES.md)，是非官方协议；本项目以原生 Swift 实现，只读取状态，没有引入其程序或 Rust 依赖。当前硬件状态包实测确认头部 CRC-8 初始值为 `0x77`，与参考文档中的 `0xEE` 不同，真实设备包已纳入检查。
+
+协作硬件测试命令（需要操作发射器开关，临时改变系统输入）：
+
+```sh
+dist/MicPriority.app/Contents/MacOS/MicPriority --check-dji-flow
+```
+
+先关闭所有发射器，再按控制台提示开机连接、关闭；检查实际控制器的回退和恢复，结束后恢复原系统输入。测试使用独立配置，并保留原来的系统选择，即使原选择当时没有发射器连接。
+
+物理拔插、蓝牙断连、射频失联和目标会议软件真实收音的验证需要实际硬件操作，不能用协议解析检查代替。

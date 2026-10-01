@@ -9,6 +9,7 @@ private func mustThrow(_ action: () throws -> Void) {
 @main
 enum RoutingChecks {
     static func main() async throws {
+        checkDJIStatus()
         let now = Date(timeIntervalSince1970: 1000)
         let a = AudioInput(uid: "A", deviceID: 1, name: "同名麦克风")
         let b = AudioInput(uid: "B", deviceID: 2, name: "同名麦克风")
@@ -109,6 +110,64 @@ enum RoutingChecks {
             try await liveSwitchAndRestore(audio, snapshot: live)
         }
         print("All routing checks passed.")
+    }
+
+    private static func checkDJIStatus() {
+        func frame(_ mask: UInt8, charging: UInt8 = 0) -> [UInt8] {
+            let units = (1...2).filter { mask & (1 << ($0 - 1)) != 0 }
+            var bytes = [UInt8](repeating: 0, count: 54 + units.count * 32)
+            bytes[0] = 0x55; bytes[1] = UInt8(bytes.count); bytes[2] = 4
+            bytes[4] = 0x5a; bytes[5] = 2; bytes[9] = 0x5b; bytes[10] = 3; bytes[11] = 3
+            bytes[12] = 0x26 + UInt8(units.count) * 0x20; bytes[44] = mask
+            for (index, unit) in units.enumerated() {
+                let offset = 52 + index * 32
+                bytes[offset] = 2; bytes[offset + 1] = UInt8(unit); bytes[offset + 5] = 26
+                bytes[offset + 7] = charging & (1 << (unit - 1)) != 0 ? 2 : 0
+            }
+            var header: UInt8 = 0x77
+            for byte in bytes.prefix(3) {
+                header ^= byte
+                for _ in 0..<8 { header = (header >> 1) ^ (header & 1 == 1 ? 0x8c : 0) }
+            }
+            bytes[3] = header
+            var crc: UInt16 = 0x3692
+            for byte in bytes.dropLast(2) {
+                crc ^= UInt16(byte)
+                for _ in 0..<8 { crc = (crc >> 1) ^ (crc & 1 == 1 ? 0x8408 : 0) }
+            }
+            bytes[bytes.count - 2] = UInt8(crc & 0xff); bytes[bytes.count - 1] = UInt8(crc >> 8)
+            return bytes
+        }
+        // Real receiver-only status captured on this Mac; status frames contain no serial strings.
+        let hex = "5536043d5a020000005b03032600030000000020200100000000000000000000000000000000000000000000000000003e0000002dfc"
+        let chars = Array(hex)
+        let fixture = stride(from: 0, to: chars.count, by: 2).map { UInt8(String(chars[$0...($0 + 1)]), radix: 16)! }
+        precondition(DJITransmitterStatus.decode(fixture)?.linked == 0)
+        for split in 1..<fixture.count {
+            var stream = DJIStatusStream()
+            precondition(stream.append(Array(fixture.prefix(split))).isEmpty)
+            precondition(stream.append(Array(fixture.dropFirst(split))).first?.linked == 0)
+        }
+        var stream = DJIStatusStream()
+        precondition(stream.append([0, 1, 2] + fixture + frame(2)).map(\.linked) == [0, 2])
+        precondition(DJITransmitterStatus.decode(frame(0))?.issue == "发射器未连接")
+        precondition(DJITransmitterStatus.decode(frame(1))?.linked == 1 && DJITransmitterStatus.decode(frame(1))?.issue == nil)
+        precondition(DJITransmitterStatus.decode(frame(2))?.linked == 2)
+        precondition(DJITransmitterStatus.decode(frame(3, charging: 1))?.charging == 1 && DJITransmitterStatus.decode(frame(3, charging: 1))?.issue == nil)
+        precondition(DJITransmitterStatus.decode(frame(3, charging: 3))?.issue == "发射器正在充电")
+        var corrupt = frame(1); corrupt[44] = 0
+        precondition(DJITransmitterStatus.decode(corrupt) == nil)
+        precondition(DJITransmitterStatus.decode(Array(frame(1).dropLast())) == nil)
+        var damagedStream = DJIStatusStream()
+        precondition(damagedStream.append(Array(fixture.dropLast()) + fixture).map(\.linked) == [0])
+        precondition(DJITransmitterStatus.decode([]) == nil)
+        let receiver = AudioInput(uid: "DJI", deviceID: 1, name: "Wireless Mic Rx", issue: "发射器未连接")
+        let fallback = AudioInput(uid: "BuiltIn", deviceID: 2, name: "Built-in")
+        let choice = RoutingPolicy.choose(priorities: [receiver.uid, fallback.uid],
+            snapshot: AudioSnapshot(inputs: [receiver, fallback], defaultUID: receiver.uid),
+            automatic: true, temporary: nil, availableSince: [:], excluded: [], now: Date())
+        precondition(choice.targetUID == fallback.uid)
+        print("PASS: DJI v2 transmitter presence, physical slots, charging, CRC/truncation rejection and fallback")
     }
 
     private static func waitFor(_ uid: String, in changes: AsyncStream<AudioSnapshot>) async throws {

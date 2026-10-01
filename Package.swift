@@ -9,7 +9,7 @@ let package = Package(
         .executable(name: "RoutingChecks", targets: ["RoutingChecks"])
     ],
     targets: [
-        .target(name: "MicPriorityCore", linkerSettings: [.linkedFramework("CoreAudio")]),
+        .target(name: "MicPriorityCore", linkerSettings: [.linkedFramework("CoreAudio"), .linkedFramework("IOKit"), .linkedFramework("IOUSBHost")]),
         .executableTarget(name: "MicPriority", dependencies: ["MicPriorityCore"]),
         .executableTarget(name: "RoutingChecks", dependencies: ["MicPriorityCore"], path: "Checks")
     ]

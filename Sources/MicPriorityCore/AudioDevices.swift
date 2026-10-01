@@ -7,6 +7,8 @@ public enum AudioEvent: Sendable {
 
 // All HAL operations and listener storage stay on this queue; callbacks only deliver immutable snapshots.
 public final class AudioDevices: @unchecked Sendable {
+    private let dji = DJIStatusMonitor()
+    private var djiStates: [String: String?] = [:]
     private let queue = DispatchQueue(label: "MicPriority.CoreAudio")
     private struct Listener {
         let object: AudioObjectID
@@ -27,14 +29,22 @@ public final class AudioDevices: @unchecked Sendable {
     }
 
     public func start(_ callback: @escaping @Sendable (Result<AudioSnapshot, AudioFailure>, AudioEvent) -> Void) {
-        queue.async {
+        queue.async { [self] in
             self.callback = callback
             self.rebuildSystemListeners()
+            self.dji.start { [weak self] states in
+                guard let self else { return }
+                self.queue.async {
+                    self.djiStates = states
+                    self.publish(.deviceStateChanged)
+                }
+            }
             self.publish(.initial)
         }
     }
 
     public func stop() {
+        dji.stop()
         queue.sync {
             remove(&systemListeners)
             remove(&deviceListeners)
@@ -156,7 +166,11 @@ public final class AudioDevices: @unchecked Sendable {
             let name = (try? string(device, kAudioObjectPropertyName)) ?? "未命名输入"
             let alive = try? number(device, kAudioDevicePropertyDeviceIsAlive)
             let allowed = try? number(device, kAudioDevicePropertyDeviceCanBeDefaultDevice, scope: kAudioObjectPropertyScopeInput)
-            let issue = channels == nil || alive == nil || allowed == nil ? "无法读取完整设备状态" : nil
+            var issue = channels == nil || alive == nil || allowed == nil ? "无法读取完整设备状态" : nil
+            if issue == nil, uid.hasPrefix("AppleUSBAudioEngine:DJI Technology Co., Ltd.:Wireless Mic Rx:") {
+                let matched = djiStates.first { uid.hasPrefix($0.key) }
+                issue = matched.map { $0.value } ?? "正在检测发射器"
+            }
             inputs.append(AudioInput(uid: uid, deviceID: device, name: name,
                                      transport: (try? number(device, kAudioDevicePropertyTransportType)) ?? 0,
                                      channels: channels ?? 0, alive: alive.map { $0 == 1 },
