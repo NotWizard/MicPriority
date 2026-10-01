@@ -110,33 +110,3 @@ struct PriorityTable: NSViewRepresentable {
         }
     }
 }
-
-struct InputRadio: NSViewRepresentable {
-    let selected: Bool
-    let enabled: Bool
-    let label: String
-    let action: () -> Void
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-    func makeNSView(context: Context) -> NSButton {
-        let button = NSButton(title: "", target: context.coordinator, action: #selector(Coordinator.choose))
-        button.setButtonType(.radio)
-        button.controlSize = .small
-        button.setContentHuggingPriority(.required, for: .horizontal)
-        return button
-    }
-    func updateNSView(_ button: NSButton, context: Context) {
-        context.coordinator.parent = self
-        button.state = selected ? .on : .off
-        button.isEnabled = enabled
-        button.setAccessibilityLabel(label)
-        button.toolTip = label
-    }
-    @MainActor final class Coordinator: NSObject {
-        var parent: InputRadio
-        init(_ parent: InputRadio) { self.parent = parent }
-        @objc func choose(_ sender: NSButton) {
-            sender.state = parent.selected ? .on : .off
-            parent.action()
-        }
-    }
-}

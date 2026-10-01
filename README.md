@@ -8,7 +8,7 @@
 
 1. 点击菜单栏的 P 麦克风图标，将常用输入加入优先级。
 2. 拖动调整顺序，也可以在每行菜单里上移、下移。建议把内置麦克风放到末尾。
-3. 开启自动切换。当前实际系统输入以原生单选圆点显示，优先级数字表示排序。
+3. 开启自动切换。当前实际系统输入以带柔和底色的勾显示（仅当前输入出现标记），优先级数字表示排序。
 
 点击其他麦克风可临时使用 30 分钟；点击最高可用优先级，即结束临时选择并继续自动管理。暂停自动切换后，点击设备只执行一次切换。首次启动默认暂停；新设备需要主动加入列表，离线设备保留原位置。
 
@@ -68,7 +68,7 @@ dist/MicPriority.app/Contents/MacOS/MicPriority --render-preview /absolute/path/
 
 ## 实现
 
-SwiftUI 菜单栏场景、AppKit 原生拖拽空位与单选控件、Core Audio、IOUSBHost、IOBluetooth、ServiceManagement。无第三方依赖。图标的确定性矢量几何源位于 `BrandArtwork.swift`，构建时自动生成不同尺寸。
+SwiftUI 菜单栏场景、AppKit 原生拖拽空位与 SF Symbols 选中状态标记、Core Audio、IOUSBHost、IOBluetooth、ServiceManagement。无第三方依赖。图标的确定性矢量几何源位于 `BrandArtwork.swift`，构建时自动生成不同尺寸。
 
 DJI 专用协议参考 [DJI Mic Control](https://github.com/ShadowBitBasher/DJI-Mic-Control/blob/main/PROTOCOL.md) 与 [MicShift 的互操作记录](https://github.com/dvnkshl/MicShift/blob/main/DJI_USB_CAPABILITIES.md)，为非官方协议。原生实现只读取状态，不发送设置命令，不抢占 USB 接口。真实设备包确认 CRC-8 seed 为 `0x77`，已经纳入检查。
 

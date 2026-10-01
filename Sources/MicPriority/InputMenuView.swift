@@ -4,6 +4,7 @@ import SwiftUI
 
 struct InputMenuView: View {
     @ObservedObject var controller: InputController
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -120,10 +121,7 @@ struct InputMenuView: View {
             .disabled(!controller.snapshotAvailable || controller.isSwitching || controller.input(saved.uid)?.isAvailable != true || controller.configurationBlocked)
             .help(selectionHelp(saved.uid))
             .accessibilityLabel("第 \(index + 1) 优先级，\(controller.name(saved.uid))，\(controller.stateText(saved.uid))\(controller.snapshot.defaultUID == saved.uid ? "，当前系统输入" : "")")
-            InputRadio(selected: controller.snapshot.defaultUID == saved.uid,
-                       enabled: controller.snapshotAvailable && !controller.isSwitching && controller.input(saved.uid)?.isAvailable == true && !controller.configurationBlocked,
-                       label: "选择\(controller.name(saved.uid))") { controller.select(saved.uid) }
-                .frame(width: 16, height: 20)
+            if controller.snapshotAvailable && controller.snapshot.defaultUID == saved.uid { selectedMark }
             Menu {
                 Button("上移") { controller.move(saved.uid, by: -1) }.disabled(index == 0)
                 Button("下移") { controller.move(saved.uid, by: 1) }
@@ -152,13 +150,21 @@ struct InputMenuView: View {
             }.buttonStyle(.plain)
                 .disabled(!controller.snapshotAvailable || controller.isSwitching || !input.isAvailable || controller.configurationBlocked)
                 .help(selectionHelp(input.uid))
-            InputRadio(selected: controller.snapshot.defaultUID == input.uid,
-                       enabled: controller.snapshotAvailable && !controller.isSwitching && input.isAvailable && !controller.configurationBlocked,
-                       label: "选择\(input.name)") { controller.select(input.uid) }.frame(width: 16, height: 20)
+            if controller.snapshotAvailable && controller.snapshot.defaultUID == input.uid { selectedMark }
             Button("加入") { controller.add(input) }.controlSize(.small)
                 .disabled(input.canBeDefault != true || controller.configurationBlocked)
                 .accessibilityLabel("将\(input.name)加入优先级")
         }.padding(.vertical, 7)
+    }
+
+    private var selectedMark: some View {
+        Image(systemName: "checkmark")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(colorScheme == .dark ? Color(red: 0.73, green: 0.89, blue: 0.79) : Color(red: 0.18, green: 0.38, blue: 0.28))
+            .frame(width: 22, height: 22)
+            .background(Color(red: 0.56, green: 0.76, blue: 0.64).opacity(colorScheme == .dark ? 0.20 : 0.22), in: Circle())
+            .accessibilityLabel("当前系统输入")
+            .help("当前系统输入")
     }
 
     private func selectionHelp(_ uid: String) -> String {
