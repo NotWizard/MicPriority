@@ -6,11 +6,12 @@
     <key>CFBundleIdentifier</key><string>com.local.MicPriority</string>
     <key>CFBundleName</key><string>MicPriority</string>
     <key>CFBundleDisplayName</key><string>麦克风优先级</string>
-    <key>CFBundleShortVersionString</key><string>0.1.1</string>
-    <key>CFBundleVersion</key><string>2</string>
+    <key>CFBundleShortVersionString</key><string>0.1.2</string>
+    <key>CFBundleVersion</key><string>3</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>
+    <key>NSBluetoothAlwaysUsageDescription</key><string>读取小米遥控器连接状态，以在断联时自动选择备用麦克风。</string>
     <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>

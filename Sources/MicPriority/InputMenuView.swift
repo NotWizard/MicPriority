@@ -96,7 +96,7 @@ struct InputMenuView: View {
                     Button("关于 MicPriority…") {
                         NSApp.orderFrontStandardAboutPanel(options: [
                             .applicationName: "MicPriority · 麦克风优先级",
-                            .applicationVersion: "0.1.1"
+                            .applicationVersion: "0.1.2"
                         ])
                         NSApp.activate(ignoringOtherApps: true)
                     }
@@ -182,7 +182,7 @@ struct InputMenuView: View {
     private func showHelp() {
         let alert = NSAlert()
         alert.messageText = "按顺序自动选择麦克风"
-        alert.informativeText = "将常用输入加入列表并拖动排序，再打开自动切换。设备离线后保留原位置，恢复稳定后自动切回。\n\n开启自动切换时，点击设备会临时使用 \(controller.temporaryMinutes) 分钟；关闭时只执行一次手动切换。\n\n会议和录音软件需要选择系统默认输入。DJI Mic Mini 系列支持读取发射器连接状态；没有可用发射器时自动使用下一优先级。其他接收器可能只能判断 USB 是否在线。主动静音和长时间安静不会触发切换。"
+        alert.informativeText = "将常用输入加入列表并拖动排序，再打开自动切换。设备离线后保留原位置，恢复稳定后自动切回。\n\n开启自动切换时，点击设备会临时使用 \(controller.temporaryMinutes) 分钟；关闭时只执行一次手动切换。\n\n会议和录音软件需要选择系统默认输入。DJI Mic Mini 系列支持读取发射器连接状态；没有可用发射器时自动使用下一优先级。MiRemoteV 2ch 会跟随小米遥控器的蓝牙连接状态。其他接收器可能只能判断 USB 是否在线。主动静音和长时间安静不会触发切换。"
         alert.addButton(withTitle: "知道了")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()

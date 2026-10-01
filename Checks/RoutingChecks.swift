@@ -9,6 +9,7 @@ private func mustThrow(_ action: () throws -> Void) {
 @main
 enum RoutingChecks {
     static func main() async throws {
+        checkMiRemoteStatus()
         checkDJIStatus()
         let now = Date(timeIntervalSince1970: 1000)
         let a = AudioInput(uid: "A", deviceID: 1, name: "同名麦克风")
@@ -106,10 +107,43 @@ enum RoutingChecks {
         }
         print("PASS: live HAL metadata (\(live.inputs.count) inputs), without opening capture")
 
+        audio.start { _, _ in }
+        audio.stop()
+        audio.refresh(rebuildListeners: true)
+        let stopped = try audio.currentSnapshot()
+        for input in stopped.inputs where input.uid == MiRemoteAvailability.uid {
+            precondition(input.issue == "正在检测小米遥控器")
+        }
+        audio.stop()
+        print("PASS: immediate observer shutdown, cache invalidation and refresh after stop")
+
         if CommandLine.arguments.contains("--live-switch") {
-            try await liveSwitchAndRestore(audio, snapshot: live)
+            try await liveSwitchAndRestore(audio)
         }
         print("All routing checks passed.")
+    }
+
+    private static func checkMiRemoteStatus() {
+        precondition(MiRemoteAvailability.isXiaomiName(" Xiaomi Bluetooth Remote 2 Pro "))
+        precondition(MiRemoteAvailability.isXiaomiName("小米蓝牙语音遥控器"))
+        precondition(!MiRemoteAvailability.isXiaomiName("MX Keys"))
+        precondition(!MiRemoteAvailability.isXiaomiName("MiRemoteV 2ch"))
+        func issue(_ connected: Bool, readable: Bool = true, running: Bool = true, paired: Bool = true) -> String? {
+            MiRemoteAvailability.issue(bluetoothReadable: readable, hasRemote: paired,
+                                       connected: connected, producerRunning: running)
+        }
+        precondition(issue(false) == "小米遥控器已断开")
+        precondition(issue(true) == nil)
+        precondition(issue(true, running: false) == "无线麦未运行")
+        precondition(issue(true, readable: false) == "无法读取小米蓝牙状态")
+        precondition(issue(false, paired: false) == "未找到已配对的小米遥控器")
+        let remote = AudioInput(uid: MiRemoteAvailability.uid, deviceID: 1, name: "MiRemoteV 2ch", issue: issue(false))
+        let backup = AudioInput(uid: "backup", deviceID: 2, name: "内置")
+        let choice = RoutingPolicy.choose(priorities: [remote.uid, backup.uid],
+            snapshot: AudioSnapshot(inputs: [remote, backup], defaultUID: remote.uid), automatic: true,
+            temporary: nil, availableSince: [:], excluded: [], now: Date())
+        precondition(!remote.isAvailable && choice.targetUID == backup.uid)
+        print("PASS: MiRemoteV Bluetooth dependency, producer absence, unknown status and fallback")
     }
 
     private static func checkDJIStatus() {
@@ -185,18 +219,24 @@ enum RoutingChecks {
         }
     }
 
-    private static func liveSwitchAndRestore(_ audio: AudioDevices, snapshot: AudioSnapshot) async throws {
-        guard let original = snapshot.defaultUID,
-              snapshot.inputs.contains(where: { $0.uid == original && $0.isAvailable }),
-              let alternate = snapshot.inputs.last(where: { $0.uid != original && $0.isAvailable }) else {
-            throw AudioFailure("Live round trip needs two available inputs and a restorable current input")
-        }
+    private static func liveSwitchAndRestore(_ audio: AudioDevices) async throws {
         let changes = AsyncStream<AudioSnapshot> { continuation in
             audio.start { result, event in
                 if case .defaultChanged = event, case let .success(value) = result { continuation.yield(value) }
             }
         }
         defer { audio.stop() }
+        var ready = try audio.currentSnapshot()
+        let deadline = Date().addingTimeInterval(3)
+        while ready.inputs.contains(where: { $0.issue == "正在检测发射器" || $0.issue == "正在检测小米遥控器" }), Date() < deadline {
+            try await Task.sleep(nanoseconds: 50_000_000)
+            ready = try audio.currentSnapshot()
+        }
+        guard let original = ready.defaultUID,
+              ready.inputs.contains(where: { $0.uid == original && $0.isAvailable }),
+              let alternate = ready.inputs.last(where: { $0.uid != original && $0.isAvailable }) else {
+            throw AudioFailure("Live round trip needs two available inputs and a restorable current input")
+        }
         do {
             try await audio.setDefaultInput(uid: alternate.uid)
             try await waitFor(alternate.uid, in: changes)

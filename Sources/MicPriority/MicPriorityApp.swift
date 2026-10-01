@@ -11,9 +11,10 @@ enum Launcher {
             listInputs()
             return
         }
-        if CommandLine.arguments.contains("--check-controller") || CommandLine.arguments.contains("--check-dji-flow") {
+        if CommandLine.arguments.contains("--check-controller") || CommandLine.arguments.contains("--check-dji-flow") || CommandLine.arguments.contains("--check-miremote-flow") {
             do {
-                if CommandLine.arguments.contains("--check-dji-flow") { try ControllerChecks.runDJI() }
+                if CommandLine.arguments.contains("--check-miremote-flow") { try ControllerChecks.runMiRemote() }
+                else if CommandLine.arguments.contains("--check-dji-flow") { try ControllerChecks.runDJI() }
                 else { try ControllerChecks.run() }
             }
             catch {
@@ -49,7 +50,7 @@ enum Launcher {
             repeat {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.05))
                 snapshot = try audio.currentSnapshot()
-            } while snapshot.inputs.contains(where: { $0.issue == "正在检测发射器" }) && Date() < deadline
+            } while snapshot.inputs.contains(where: { $0.issue == "正在检测发射器" || $0.issue == "正在检测小米遥控器" }) && Date() < deadline
             let result: [String: Any] = [
                 "defaultInput": snapshot.defaultName ?? "none",
                 "inputs": snapshot.inputs.map { input -> [String: Any] in
@@ -88,7 +89,7 @@ enum Launcher {
             let controller = InputController(defaults: defaults)
             defer { controller.stop() }
             let deadline = Date().addingTimeInterval(3)
-            while (!controller.snapshotAvailable || controller.snapshot.inputs.contains(where: { $0.issue == "正在检测发射器" })) && Date() < deadline {
+            while (!controller.snapshotAvailable || controller.snapshot.inputs.contains(where: { $0.issue == "正在检测发射器" || $0.issue == "正在检测小米遥控器" })) && Date() < deadline {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.02))
             }
             guard controller.snapshotAvailable else { throw AudioFailure("No live snapshot for preview") }

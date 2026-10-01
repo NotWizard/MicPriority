@@ -26,7 +26,7 @@ final class InputController: ObservableObject {
         let attempt: Int
         let manual: Bool
     }
-    private let audio = AudioDevices()
+    private let audio: AudioDevices
     private let defaults: UserDefaults
     private let preferencesKey = "inputPreferences"
     private let logger = Logger(subsystem: "com.local.MicPriority", category: "Routing")
@@ -47,6 +47,7 @@ final class InputController: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        audio = AudioDevices(defaults: defaults)
         recoveryDelay = Self.parameter(defaults, "recoveryDelaySeconds", fallback: 2, range: 0.1...30)
         confirmationTimeout = Self.parameter(defaults, "confirmationTimeoutSeconds", fallback: 1.5, range: 0.3...10)
         temporaryDuration = Self.parameter(defaults, "temporaryDurationSeconds", fallback: 1800, range: 60...28800)
@@ -126,6 +127,7 @@ final class InputController: ObservableObject {
         return input.isAvailable ? "在线" : "不支持默认输入"
     }
     func transportText(_ input: AudioInput) -> String {
+        if input.uid == MiRemoteAvailability.uid { return "虚拟输入" }
         switch input.transport {
         case kAudioDeviceTransportTypeBuiltIn: return "内置"
         case kAudioDeviceTransportTypeUSB: return "USB"
@@ -245,7 +247,7 @@ final class InputController: ObservableObject {
             "\(hash($0.uid)) · \(transportText($0)) · channels=\($0.channels) · available=\($0.isAvailable) · excluded=\(protection.excluded(at: Date()).contains($0.uid))"
         }
         let failure = lastSwitchFailure.map { "\(hash($0.uid)): \($0.message)" } ?? "none"
-        let text = (["MicPriority 0.1.1", ProcessInfo.processInfo.operatingSystemVersionString,
+        let text = (["MicPriority 0.1.2", ProcessInfo.processInfo.operatingSystemVersionString,
                      "automatic=\(preferences.automaticEnabled), temporary=\(temporary != nil)",
                      "current=\(hash(snapshot.defaultUID))", "lastReason=\(lastReason)",
                      "issue=\(issue ?? "none")", "lastFailure=\(failure)"] + rows).joined(separator: "\n")

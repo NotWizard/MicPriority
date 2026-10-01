@@ -7,19 +7,23 @@ import MicPriorityCore
 enum ControllerChecks {
     static func run() throws {
         NSApplication.shared.setActivationPolicy(.prohibited)
-        let live = try AudioDevices().currentSnapshot()
-        guard let original = live.defaultUID,
-              let originalInput = live.inputs.first(where: { $0.uid == original && $0.isAvailable }),
-              let alternate = live.inputs.last(where: { $0.uid != original && $0.isAvailable }) else {
-            throw AudioFailure("Controller check needs two available inputs")
-        }
         let suite = "com.local.MicPriority.ControllerChecks.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.set(0.1, forKey: "recoveryDelaySeconds")
         defer { defaults.removePersistentDomain(forName: suite) }
         let controller = InputController(defaults: defaults)
         defer { controller.stop() }
-        try wait("initial snapshot") { controller.snapshotAvailable }
+        try wait("initial snapshot and dependency states") {
+            controller.snapshotAvailable && !controller.snapshot.inputs.contains {
+                $0.issue == "正在检测发射器" || $0.issue == "正在检测小米遥控器"
+            }
+        }
+        let live = controller.snapshot
+        guard let original = live.defaultUID,
+              let originalInput = live.inputs.first(where: { $0.uid == original && $0.isAvailable }),
+              let alternate = live.inputs.last(where: { $0.uid != original && $0.isAvailable }) else {
+            throw AudioFailure("Controller check needs two available inputs")
+        }
         guard !controller.preferences.automaticEnabled, controller.preferences.priorities.isEmpty else {
             throw AudioFailure("Fresh controller unexpectedly enabled routing")
         }
@@ -85,14 +89,29 @@ enum ControllerChecks {
     }
 
     static func runDJI() throws {
+        try runWirelessFlow(receiverPrefix: "AppleUSBAudioEngine:DJI Technology Co., Ltd.:Wireless Mic Rx:",
+                            disconnectedIssue: "发射器未连接", initiallyConnected: false,
+                            connectPrompt: "turn one DJI transmitter ON and link it",
+                            disconnectPrompt: "turn DJI transmitter OFF, leave receiver plugged in")
+    }
+
+    static func runMiRemote() throws {
+        try runWirelessFlow(receiverPrefix: MiRemoteAvailability.uid,
+                            disconnectedIssue: "小米遥控器已断开", initiallyConnected: !CommandLine.arguments.contains("--start-disconnected") && !CommandLine.arguments.contains("--verify-disconnected"),
+                            connectPrompt: "connect Xiaomi remote and confirm SayAll connected",
+                            disconnectPrompt: "disconnect Xiaomi Bluetooth remote, keep SayAll running")
+    }
+
+    private static func runWirelessFlow(receiverPrefix: String, disconnectedIssue: String,
+                                        initiallyConnected: Bool, connectPrompt: String, disconnectPrompt: String) throws {
         NSApplication.shared.setActivationPolicy(.prohibited)
         let live = try AudioDevices().currentSnapshot()
         guard let original = live.defaultUID,
-              let receiver = live.inputs.first(where: { $0.uid.hasPrefix("AppleUSBAudioEngine:DJI Technology Co., Ltd.:Wireless Mic Rx:") }),
+              let receiver = live.inputs.first(where: { $0.uid.hasPrefix(receiverPrefix) }),
               let fallback = live.inputs.first(where: { $0.transport == kAudioDeviceTransportTypeBuiltIn && $0.isAvailable }) else {
-            throw AudioFailure("DJI flow needs a connected DJI receiver and built-in input")
+            throw AudioFailure("Wireless flow needs the target receiver and built-in input")
         }
-        let suite = "com.local.MicPriority.DJICheck.\(UUID().uuidString)"
+        let suite = "com.local.MicPriority.WirelessCheck.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         var preferences = InputPreferences()
@@ -101,43 +120,61 @@ enum ControllerChecks {
         let controller = InputController(defaults: defaults)
         defer { controller.stop() }
         func report(_ text: String) { print(text); fflush(stdout) }
-        func restore() throws {
-            controller.setAutomatic(false)
-            controller.stop()
+        func writeDefault(_ uid: String) throws {
             let audio = AudioDevices()
             let snapshot = try audio.currentSnapshot()
-            guard let input = snapshot.inputs.first(where: { $0.uid == original && $0.alive == true && $0.canBeDefault == true }) else {
-                throw AudioFailure("Original receiver is no longer present for restoration")
+            guard let input = snapshot.inputs.first(where: { $0.uid == uid && $0.alive == true && $0.canBeDefault == true }) else {
+                throw AudioFailure("Requested receiver is no longer present for this check")
             }
             // Restore the pre-test default even if its transmitter is off; do not alter user preferences.
             var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice,
                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
             var device = input.deviceID
             let status = AudioObjectSetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, 4, &device)
-            guard status == noErr, try audio.currentSnapshot().defaultUID == original else {
-                throw AudioFailure("Original input restoration failed", status: status)
+            guard status == noErr, try audio.currentSnapshot().defaultUID == uid else {
+                throw AudioFailure("Test input write was not confirmed", status: status)
             }
         }
+        func restore() throws {
+            controller.setAutomatic(false)
+            controller.stop()
+            try writeDefault(original)
+        }
         do {
-            try wait("DJI transmitter off baseline") { controller.input(receiver.uid)?.issue == "发射器未连接" }
-            controller.setAutomatic(true)
-            try wait("DJI off fallback") { settled(controller, on: fallback.uid) }
-            report("PASS: receiver present + transmitter off selects built-in input")
-            report("READY: turn one transmitter ON and link it")
-            try wait("physical transmitter connection and promotion", timeout: 180) {
-                controller.input(receiver.uid)?.isAvailable == true && settled(controller, on: receiver.uid)
+            let count = CommandLine.arguments.contains("--verify-disconnected") ? 1 : CommandLine.arguments.contains("--one-transition") ? 2 : 3
+            let states = Array([initiallyConnected, !initiallyConnected, initiallyConnected].prefix(count))
+            for (index, connected) in states.enumerated() {
+                if index > 0 { report("READY: \(connected ? connectPrompt : disconnectPrompt)") }
+                try wait("physical connection state", timeout: index == 0 ? 8 : 600) {
+                    if connected { return controller.input(receiver.uid)?.isAvailable == true }
+                    return controller.input(receiver.uid)?.issue == disconnectedIssue
+                }
+                if index == 0 { controller.setAutomatic(true) }
+                let target = connected ? receiver.uid : fallback.uid
+                do { try wait("confirmed wireless routing") { settled(controller, on: target) } }
+                catch {
+                    report("DIAGNOSTIC: current=\(controller.currentName), source=\(controller.stateText(receiver.uid)), pending=\(controller.isSwitching), automatic=\(controller.preferences.automaticEnabled), issue=\(controller.issue ?? "none"), reason=\(controller.lastReason)")
+                    throw error
+                }
+                report("PASS: \(connected ? "linked selects wireless input" : "disconnected selects built-in input")")
+                if !connected {
+                    guard controller.input(receiver.uid) != nil else { throw AudioFailure("Virtual receiver disappeared during the check") }
+                    report("PASS: audio input remains listed while its source is disconnected")
+                }
             }
-            report("PASS: transmitter link restores highest-priority receiver")
-            report("READY: turn transmitter OFF, leave receiver plugged in")
-            try wait("physical transmitter loss and fallback", timeout: 180) {
-                controller.input(receiver.uid)?.issue == "发射器未连接" && settled(controller, on: fallback.uid)
+            if CommandLine.arguments.contains("--verify-disconnected") {
+                // Real disconnected hardware remains present; emulate another source selecting that unusable input.
+                try writeDefault(receiver.uid)
+                try wait("automatic correction of disconnected input") {
+                    settled(controller, on: fallback.uid) && (try? AudioDevices().currentSnapshot())?.defaultUID == fallback.uid
+                }
+                report("PASS: selecting the disconnected source is automatically corrected to built-in input")
             }
-            report("PASS: transmitter power-off automatically falls back while USB stays connected")
             try restore()
             report("PASS: original system default restored; normal preferences untouched")
         } catch {
             do { try restore() }
-            catch let restorationError { throw AudioFailure("DJI flow failed; restoration needs attention: \(restorationError.localizedDescription)") }
+            catch let restorationError { throw AudioFailure("Wireless flow failed; restoration needs attention: \(restorationError.localizedDescription)") }
             throw error
         }
     }

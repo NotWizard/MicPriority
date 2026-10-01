@@ -7,6 +7,9 @@ public enum AudioEvent: Sendable {
 
 // All HAL operations and listener storage stay on this queue; callbacks only deliver immutable snapshots.
 public final class AudioDevices: @unchecked Sendable {
+    private let miRemote: MiRemoteStatusMonitor
+    private var miRemoteStarted = false
+    private var miRemoteIssue: String? = "正在检测小米遥控器"
     private let dji = DJIStatusMonitor()
     private var djiStates: [String: String?] = [:]
     private let queue = DispatchQueue(label: "MicPriority.CoreAudio")
@@ -22,7 +25,7 @@ public final class AudioDevices: @unchecked Sendable {
     private var monitoringIssues: [String] = []
     private var callback: (@Sendable (Result<AudioSnapshot, AudioFailure>, AudioEvent) -> Void)?
 
-    public init() {}
+    public init(defaults: UserDefaults = .standard) { miRemote = MiRemoteStatusMonitor(defaults: defaults) }
 
     public func currentSnapshot() throws -> AudioSnapshot {
         try queue.sync { try snapshot() }
@@ -35,6 +38,7 @@ public final class AudioDevices: @unchecked Sendable {
             self.dji.start { [weak self] states in
                 guard let self else { return }
                 self.queue.async {
+                    guard self.callback != nil else { return }
                     self.djiStates = states
                     self.publish(.deviceStateChanged)
                 }
@@ -44,17 +48,23 @@ public final class AudioDevices: @unchecked Sendable {
     }
 
     public func stop() {
-        dji.stop()
         queue.sync {
+            // Serialize shutdown after any queued start, so metadata monitors cannot start after stop.
+            dji.stop()
+            miRemote.stop()
             remove(&systemListeners)
             remove(&deviceListeners)
             monitoredIDs.removeAll()
+            miRemoteStarted = false
+            miRemoteIssue = "正在检测小米遥控器"
+            djiStates.removeAll()
             callback = nil
         }
     }
 
     public func refresh(rebuildListeners: Bool = false) {
         queue.async {
+            guard self.callback != nil else { return }
             if rebuildListeners {
                 self.remove(&self.deviceListeners)
                 self.monitoredIDs.removeAll()
@@ -171,6 +181,7 @@ public final class AudioDevices: @unchecked Sendable {
                 let matched = djiStates.first { uid.hasPrefix($0.key) }
                 issue = matched.map { $0.value } ?? "正在检测发射器"
             }
+            if issue == nil, uid == MiRemoteAvailability.uid { issue = miRemoteIssue }
             inputs.append(AudioInput(uid: uid, deviceID: device, name: name,
                                      transport: (try? number(device, kAudioDevicePropertyTransportType)) ?? 0,
                                      channels: channels ?? 0, alive: alive.map { $0 == 1 },
@@ -184,6 +195,7 @@ public final class AudioDevices: @unchecked Sendable {
     }
 
     private func publish(_ event: AudioEvent) {
+        guard callback != nil else { return }
         do {
             let ids = Set(try deviceIDs())
             if ids != monitoredIDs {
@@ -198,7 +210,19 @@ public final class AudioDevices: @unchecked Sendable {
                     add(device, kAudioObjectPropertyName, event: .deviceStateChanged, to: &deviceListeners)
                 }
             }
-            callback?(.success(try snapshot()), event)
+            let value = try snapshot()
+            if !miRemoteStarted, value.inputs.contains(where: { $0.uid == MiRemoteAvailability.uid }) {
+                miRemoteStarted = true
+                miRemote.start { [weak self] issue in
+                    guard let self else { return }
+                    self.queue.async {
+                        guard self.callback != nil else { return }
+                        self.miRemoteIssue = issue
+                        self.publish(.deviceStateChanged)
+                    }
+                }
+            }
+            callback?(.success(value), event)
         } catch {
             callback?(.failure(error as? AudioFailure ?? AudioFailure(error.localizedDescription)), event)
         }
@@ -219,7 +243,7 @@ public final class AudioDevices: @unchecked Sendable {
         var address = Self.address(selector, scope: scope)
         guard AudioObjectHasProperty(object, &address) else { return }
         let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            guard let self else { return }
+            guard let self, self.callback != nil else { return }
             if case .serviceRestarted = event {
                 self.remove(&self.deviceListeners)
                 self.monitoredIDs.removeAll()
