@@ -6,7 +6,7 @@ Native macOS, macOS 13 or later.
 
 ## Stack
 
-Swift, SwiftUI MenuBarExtra, Core Audio, ServiceManagement, Swift Package Manager. The user authorized implementing the previously delivered native design.
+Swift, SwiftUI MenuBarExtra, Core Audio, ServiceManagement, Swift Package Manager, AppKit, IOUSBHost and IOBluetooth. The user authorized implementing the previously delivered native design.
 
 ## Users
 
@@ -18,7 +18,7 @@ Select the highest-priority available system input and keep disconnected devices
 
 ## Capabilities and Constraints
 
-Ordered device membership, automatic fallback, stable recovery, temporary selection, pause, persisted preferences, and optional login launch. First launch is read-only until the user adds devices and enables management. The tool manages system default input; per-app fixed routes and wireless transmitters failing behind an attached receiver are documented limitations.
+Ordered device membership, automatic fallback, stable recovery, temporary selection, pause, persisted preferences, and optional login launch. First launch is read-only until the user adds devices and enables management. The tool manages system default input; per-app fixed routes remain a limitation. DJI v2 receiver status and the MiRemoteV Xiaomi Bluetooth source have dedicated availability checks.
 
 ## Product Principles
 
@@ -29,4 +29,4 @@ Ordered device membership, automatic fallback, stable recovery, temporary select
 
 ## Accessibility & Inclusion
 
-Chinese UI, system light/dark appearance, keyboard controls, VoiceOver labels, and up/down menu actions alongside drag ordering.
+Chinese UI, system light/dark appearance, keyboard controls, VoiceOver labels, and up/down menu actions alongside native gap drag ordering. Clicking the highest available priority ends a temporary override.

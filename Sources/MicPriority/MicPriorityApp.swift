@@ -13,6 +13,11 @@ enum Launcher {
         }
         if CommandLine.arguments.contains("--check-controller") || CommandLine.arguments.contains("--check-dji-flow") || CommandLine.arguments.contains("--check-miremote-flow") {
             do {
+                let identifier = Bundle.main.bundleIdentifier ?? "com.local.MicPriority"
+                guard !NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
+                    .contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) else {
+                    throw AudioFailure("请先退出正在运行的 MicPriority，再执行实际切换检查")
+                }
                 if CommandLine.arguments.contains("--check-miremote-flow") { try ControllerChecks.runMiRemote() }
                 else if CommandLine.arguments.contains("--check-dji-flow") { try ControllerChecks.runDJI() }
                 else { try ControllerChecks.run() }
@@ -78,7 +83,7 @@ enum Launcher {
             app.appearance = NSAppearance(named: CommandLine.arguments.contains("--dark") ? .darkAqua : .aqua)
             let live = try AudioDevices().currentSnapshot()
             var preferences = InputPreferences()
-            let samples = [live.inputs.last, live.inputs.first].compactMap { $0 }
+            let samples = CommandLine.arguments.contains("--preview-all-inputs") ? live.inputs : [live.inputs.last, live.inputs.first].compactMap { $0 }
             var seen = Set<String>()
             preferences.priorities = samples.filter { seen.insert($0.uid).inserted }
                 .map { SavedInput(uid: $0.uid, name: $0.name) }
@@ -131,8 +136,8 @@ struct MicPriorityApplication: App {
         MenuBarExtra {
             InputMenuView(controller: controller)
         } label: {
-            Image(systemName: "mic")
-                .frame(width: 14, height: 16)
+            Image(nsImage: BrandArtwork.menuIcon)
+                .frame(width: 16, height: 18)
                 .overlay(alignment: .bottomTrailing) {
                     if let badge = controller.menuBarBadge {
                         Image(systemName: badge).font(.system(size: 8, weight: .semibold))

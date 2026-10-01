@@ -34,7 +34,6 @@ struct InputMenuView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("恢复自动", action: controller.resumeAutomatic).controlSize(.small)
                     }
                 }
             }.padding(16)
@@ -52,16 +51,11 @@ struct InputMenuView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 16).padding(.vertical, 12)
             } else {
-                List {
-                    ForEach(Array(controller.preferences.priorities.enumerated()), id: \.element.uid) { index, saved in
-                        priorityRow(saved, index: index)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 8))
-                    }.onMove(perform: controller.move)
+                PriorityTable(controller: controller) { saved, index in
+                    AnyView(priorityRow(saved, index: index))
                 }
-                .listStyle(.plain).scrollContentBackground(.hidden)
-                .frame(height: min(260, CGFloat(controller.preferences.priorities.count) * 53 + 12))
-                .padding(.horizontal, 6)
+                .frame(height: min(280, CGFloat(controller.preferences.priorities.count) * 56))
+                .padding(.horizontal, 10)
             }
 
             if !controller.otherInputs.isEmpty {
@@ -84,8 +78,6 @@ struct InputMenuView: View {
                     .toggleStyle(.checkbox).controlSize(.small)
                 Spacer()
                 Menu("更多") {
-                    Button("恢复自动", action: controller.resumeAutomatic)
-                        .disabled(controller.preferences.priorities.isEmpty || controller.configurationBlocked)
                     Button("重新检测输入", action: controller.refresh)
                     Button("复制诊断信息", action: controller.copyDiagnostics)
                     if controller.configurationBlocked {
@@ -93,13 +85,7 @@ struct InputMenuView: View {
                     }
                     Divider()
                     Button("使用说明…", action: showHelp)
-                    Button("关于 MicPriority…") {
-                        NSApp.orderFrontStandardAboutPanel(options: [
-                            .applicationName: "MicPriority · 麦克风优先级",
-                            .applicationVersion: "0.1.2"
-                        ])
-                        NSApp.activate(ignoringOtherApps: true)
-                    }
+                    Button("关于 MicPriority…", action: BrandArtwork.showAbout)
                     Divider()
                     Button("退出 MicPriority") { NSApp.terminate(nil) }.keyboardShortcut("q")
                 }.menuStyle(.borderlessButton).fixedSize().controlSize(.small)
@@ -127,16 +113,17 @@ struct InputMenuView: View {
                             .lineLimit(1).help(controller.stateText(saved.uid))
                     }
                     Spacer(minLength: 4)
-                    if controller.snapshot.defaultUID == saved.uid {
-                        Image(systemName: "checkmark").font(.body.weight(.semibold)).foregroundStyle(Color.accentColor)
-                            .accessibilityLabel("当前系统输入")
-                    }
+
                 }.contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!controller.snapshotAvailable || controller.isSwitching || controller.input(saved.uid)?.isAvailable != true || controller.configurationBlocked)
             .help(selectionHelp(saved.uid))
             .accessibilityLabel("第 \(index + 1) 优先级，\(controller.name(saved.uid))，\(controller.stateText(saved.uid))\(controller.snapshot.defaultUID == saved.uid ? "，当前系统输入" : "")")
+            InputRadio(selected: controller.snapshot.defaultUID == saved.uid,
+                       enabled: controller.snapshotAvailable && !controller.isSwitching && controller.input(saved.uid)?.isAvailable == true && !controller.configurationBlocked,
+                       label: "选择\(controller.name(saved.uid))") { controller.select(saved.uid) }
+                .frame(width: 16, height: 20)
             Menu {
                 Button("上移") { controller.move(saved.uid, by: -1) }.disabled(index == 0)
                 Button("下移") { controller.move(saved.uid, by: 1) }
@@ -160,14 +147,14 @@ struct InputMenuView: View {
                             .lineLimit(1).help(controller.stateText(input.uid))
                     }
                     Spacer(minLength: 4)
-                    if controller.snapshot.defaultUID == input.uid {
-                        Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
-                            .accessibilityLabel("当前系统输入")
-                    }
+
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .disabled(!controller.snapshotAvailable || controller.isSwitching || !input.isAvailable || controller.configurationBlocked)
                 .help(selectionHelp(input.uid))
+            InputRadio(selected: controller.snapshot.defaultUID == input.uid,
+                       enabled: controller.snapshotAvailable && !controller.isSwitching && input.isAvailable && !controller.configurationBlocked,
+                       label: "选择\(input.name)") { controller.select(input.uid) }.frame(width: 16, height: 20)
             Button("加入") { controller.add(input) }.controlSize(.small)
                 .disabled(input.canBeDefault != true || controller.configurationBlocked)
                 .accessibilityLabel("将\(input.name)加入优先级")
@@ -175,14 +162,15 @@ struct InputMenuView: View {
     }
 
     private func selectionHelp(_ uid: String) -> String {
-        let action = controller.preferences.automaticEnabled ? "点击临时使用 \(controller.temporaryMinutes) 分钟" : "点击切换系统输入"
+        let action = controller.preferences.automaticEnabled ? (uid == controller.preferredAvailableUID ? "点击按优先级自动选择" : "点击临时使用 \(controller.temporaryMinutes) 分钟") : "点击切换系统输入"
         return "\(controller.name(uid))\n\(action)"
     }
 
     private func showHelp() {
         let alert = NSAlert()
+        alert.icon = BrandArtwork.appIcon
         alert.messageText = "按顺序自动选择麦克风"
-        alert.informativeText = "将常用输入加入列表并拖动排序，再打开自动切换。设备离线后保留原位置，恢复稳定后自动切回。\n\n开启自动切换时，点击设备会临时使用 \(controller.temporaryMinutes) 分钟；关闭时只执行一次手动切换。\n\n会议和录音软件需要选择系统默认输入。DJI Mic Mini 系列支持读取发射器连接状态；没有可用发射器时自动使用下一优先级。MiRemoteV 2ch 会跟随小米遥控器的蓝牙连接状态。其他接收器可能只能判断 USB 是否在线。主动静音和长时间安静不会触发切换。"
+        alert.informativeText = "将常用输入加入列表并拖动排序，再打开自动切换。设备离线后保留原位置，恢复稳定后自动切回。\n\n开启自动切换时，点击其他设备可临时使用 \(controller.temporaryMinutes) 分钟；点击最高可用优先级即可结束临时使用；关闭自动切换时只执行一次手动切换。\n\n会议和录音软件需要选择系统默认输入。DJI Mic Mini 系列支持读取发射器连接状态；没有可用发射器时自动使用下一优先级。MiRemoteV 2ch 会跟随小米遥控器的蓝牙连接状态。其他接收器可能只能判断 USB 是否在线。主动静音和长时间安静不会触发切换。"
         alert.addButton(withTitle: "知道了")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()

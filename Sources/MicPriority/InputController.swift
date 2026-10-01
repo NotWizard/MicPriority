@@ -181,18 +181,20 @@ final class InputController: ObservableObject {
         if enabled { audio.refresh(rebuildListeners: true) }
         evaluate()
     }
-    func resumeAutomatic() {
-        setAutomatic(true)
+    var preferredAvailableUID: String? {
+        guard snapshotAvailable else { return nil }
+        let excluded = protection.excluded(at: Date())
+        return preferences.priorities.first { input($0.uid)?.isAvailable == true && !excluded.contains($0.uid) }?.uid
     }
 
     func select(_ uid: String) {
         guard pending == nil, snapshotAvailable, !configurationBlocked, input(uid)?.isAvailable == true else { return }
         protection.reconnected(uid: uid)
         if preferences.automaticEnabled {
-            temporary = TemporaryInput(uid: uid, expiresAt: Date().addingTimeInterval(temporaryDuration))
+            temporary = uid == preferredAvailableUID ? nil : TemporaryInput(uid: uid, expiresAt: Date().addingTimeInterval(temporaryDuration))
         }
         issue = nil
-        let reason = preferences.automaticEnabled ? "临时使用：\(name(uid))" : "手动选择：\(name(uid))"
+        let reason = preferences.automaticEnabled ? (temporary == nil ? "按优先级自动选择输入" : "临时使用：\(name(uid))") : "手动选择：\(name(uid))"
         if snapshot.defaultUID == uid {
             lastReason = reason
             evaluate()
@@ -247,7 +249,7 @@ final class InputController: ObservableObject {
             "\(hash($0.uid)) · \(transportText($0)) · channels=\($0.channels) · available=\($0.isAvailable) · excluded=\(protection.excluded(at: Date()).contains($0.uid))"
         }
         let failure = lastSwitchFailure.map { "\(hash($0.uid)): \($0.message)" } ?? "none"
-        let text = (["MicPriority 0.1.2", ProcessInfo.processInfo.operatingSystemVersionString,
+        let text = (["MicPriority \(BrandArtwork.version)", ProcessInfo.processInfo.operatingSystemVersionString,
                      "automatic=\(preferences.automaticEnabled), temporary=\(temporary != nil)",
                      "current=\(hash(snapshot.defaultUID))", "lastReason=\(lastReason)",
                      "issue=\(issue ?? "none")", "lastFailure=\(failure)"] + rows).joined(separator: "\n")

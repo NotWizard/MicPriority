@@ -7,6 +7,13 @@ import MicPriorityCore
 enum ControllerChecks {
     static func run() throws {
         NSApplication.shared.setActivationPolicy(.prohibited)
+        guard BrandArtwork.menuIcon.isTemplate, BrandArtwork.menuIcon.size.height == 18,
+              BrandArtwork.credits.attribute(.link, at: 0, effectiveRange: nil) as? URL == BrandArtwork.repositoryURL,
+              Bundle.main.url(forResource: "AppIcon", withExtension: "icns") != nil,
+              Bundle.main.url(forResource: "MenuBar", withExtension: "pdf") != nil else {
+            throw AudioFailure("Brand assets or repository credit are missing")
+        }
+        print("PASS: bundled App/menu icons, template sizing and clickable repository credit")
         let suite = "com.local.MicPriority.ControllerChecks.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.set(0.1, forKey: "recoveryDelaySeconds")
@@ -59,10 +66,10 @@ enum ControllerChecks {
             }
             print("PASS: temporary selection holds original input without changing priorities")
 
-            controller.resumeAutomatic()
-            try wait("resume automatic") { settled(controller, on: alternate.uid) }
+            controller.select(alternate.uid)
+            try wait("click highest available priority") { settled(controller, on: alternate.uid) }
             guard controller.temporary == nil else { throw AudioFailure("Temporary override was not cleared") }
-            print("PASS: resume automatic clears the override and returns to highest priority")
+            print("PASS: clicking highest available priority clears the override and returns to automatic")
 
             controller.select(original)
             try wait("restore original input") { settled(controller, on: original) }
