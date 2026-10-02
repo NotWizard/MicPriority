@@ -11,6 +11,14 @@
 
 MicPriority is a native macOS menu bar utility. Rank your preferred microphones, switch to the next available input when the current one becomes unavailable, and return when a higher-priority input recovers. There is no main window, and the app does not record or save audio.
 
+## Why this tool exists
+
+MicPriority began with a recurring frustration during AI coding and vibe coding. Voice input makes it convenient to describe an idea or a change to an AI assistant, and a dedicated wireless microphone can help make that input clearer.
+
+The transmitter gets turned off and back on, while its receiver often stays plugged into the Mac. Even with the transmitter off, macOS may keep the receiver selected as its input. The next time you start speaking, nothing comes through, so you have to open sound settings and switch microphones manually. Turning the microphone back on can mean another trip to those settings.
+
+**MicPriority exists to remove that repeated interruption.** Set your preferred input order once, let an available microphone take over, and return when your preferred microphone recovers, so you can stay focused on explaining ideas and writing code. For a receiver that remains online while its transmitter is disconnected, dedicated support currently covers the DJI and Xiaomi remote setups listed below.
+
 ## Download and install
 
 **[Download the latest release](https://github.com/NotWizard/MicPriority/releases/latest)** · macOS 13 or later.
