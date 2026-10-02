@@ -68,6 +68,15 @@ func checkUpdates() throws {
         let target = root.appendingPathComponent("Installed app with spaces.app")
         try AppUpdate.run("/usr/bin/ditto", [old.path, target.path])
         let original = try Data(contentsOf: target.appendingPathComponent("Contents/Info.plist"))
+        let intel = root.appendingPathComponent("Unsupported Intel.app")
+        try AppUpdate.run("/usr/bin/ditto", [new.path, intel.path])
+        let intelExecutable = intel.appendingPathComponent("Contents/MacOS/MicPriority")
+        try fm.removeItem(at: intelExecutable)
+        try AppUpdate.run("/usr/bin/lipo", [old.appendingPathComponent("Contents/MacOS/MicPriority").path,
+                                           "-thin", "x86_64", "-output", intelExecutable.path])
+        try AppUpdate.run("/usr/bin/codesign", ["--force", "--sign", "-", "--options", "runtime", intel.path])
+        rejects { try AppUpdate.validate(intel, version: newVersion) }
+        print("PASS: native architecture API rejects a validly signed Intel-only app")
         let stage = try AppUpdate.stage(new, target: target, version: newVersion)
         defer { try? fm.removeItem(at: stage) }
         let stagedInfo = stage.appendingPathComponent("MicPriority.app/Contents/Info.plist")

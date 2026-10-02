@@ -35,3 +35,5 @@ dist/MicPriority.app/Contents/MacOS/MicPriority --check-update-installer
 ```
 
 发布接口：[GitHub Release API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。SayAll 场景来源：[SayAll 项目](https://github.com/HD838A/remote-mic-app)。应用本身不依赖或分发 SayAll 代码。
+
+架构检查自 v0.3.1 起使用 macOS [CFBundleCopyExecutableArchitecturesForURL](https://developer.apple.com/documentation/corefoundation/cfbundlecopyexecutablearchitecturesforurl(_:)) 原生 API；运行时不调用 lipo。完整重启检查会对自己的临时测试副本强制清理，以免失败提示框阻止正常退出。

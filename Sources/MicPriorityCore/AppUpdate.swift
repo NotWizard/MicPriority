@@ -1,4 +1,5 @@
 import CryptoKit
+import CoreFoundation
 import Foundation
 
 public struct ReleaseVersion: Comparable, Sendable {
@@ -180,7 +181,8 @@ public enum AppUpdate {
         }
         try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path])
         let executable = app.appendingPathComponent("Contents/MacOS/MicPriority")
-        guard try run("/usr/bin/lipo", [executable.path, "-archs"]).split(whereSeparator: { $0.isWhitespace }).contains("arm64") else {
+        let architectures = CFBundleCopyExecutableArchitecturesForURL(executable as CFURL) as? [NSNumber] ?? []
+        guard architectures.contains(where: { $0.intValue == Int(kCFBundleExecutableArchitectureARM64) }) else {
             throw AudioFailure("此安装包不支持 Apple Silicon。")
         }
     }

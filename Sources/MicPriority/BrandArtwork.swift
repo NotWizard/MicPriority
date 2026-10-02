@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 enum BrandArtwork {
     static let repositoryURL = URL(string: "https://github.com/NotWizard/MicPriority")!
-    static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.0" }
+    static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.1" }
     static var menuIcon: NSImage {
         let image = Bundle.main.url(forResource: "MenuBar", withExtension: "pdf").flatMap(NSImage.init(contentsOf:))
             ?? NSImage(size: NSSize(width: 24, height: 28), flipped: false) { _ in

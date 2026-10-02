@@ -23,7 +23,7 @@ The transmitter gets turned off and back on, while its receiver often stays plug
 
 **[Download the latest release](https://github.com/NotWizard/MicPriority/releases/latest)** · macOS 13 or later, **Apple Silicon (M-series) only**.
 
-1. Download and extract `MicPriority-0.3.0-macOS-apple-silicon.zip`.
+1. Download and extract `MicPriority-0.3.1-macOS-apple-silicon.zip`.
 2. Move `MicPriority.app` to Applications and open it.
 3. Click the P microphone icon in the menu bar to configure your priorities.
 

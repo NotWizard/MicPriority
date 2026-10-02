@@ -6,8 +6,8 @@
     <key>CFBundleIdentifier</key><string>com.local.MicPriority</string>
     <key>CFBundleName</key><string>MicPriority</string>
     <key>CFBundleDisplayName</key><string>麦克风优先级</string>
-    <key>CFBundleShortVersionString</key><string>0.3.0</string>
-    <key>CFBundleVersion</key><string>6</string>
+    <key>CFBundleShortVersionString</key><string>0.3.1</string>
+    <key>CFBundleVersion</key><string>7</string>
     <key>CFBundleIconFile</key><string>AppIcon.icns</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>

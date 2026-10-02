@@ -23,7 +23,7 @@ MicPriority 最初来自 AI coding 和 vibe coding 中一个反复出现的小�
 
 **[下载最新版](https://github.com/NotWizard/MicPriority/releases/latest)** · macOS 13 或更新版本，**仅支持 Apple Silicon（M 系列芯片）**。
 
-1. 下载 `MicPriority-0.3.0-macOS-apple-silicon.zip` 并解压。
+1. 下载 `MicPriority-0.3.1-macOS-apple-silicon.zip` 并解压。
 2. 将 `MicPriority.app` 移到“应用程序”，然后打开。
 3. 菜单栏出现 P 麦克风图标，点击即可开始设置。
 
