@@ -18,6 +18,12 @@ enum ControllerChecks {
             while applications.contains(where: { !$0.isTerminated }) && Date() < deadline {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.1))
             }
+            // A failure alert can defer a normal quit; force only this disposable test copy.
+            applications.filter { !$0.isTerminated }.forEach { $0.forceTerminate() }
+            let forceDeadline = Date().addingTimeInterval(3)
+            while applications.contains(where: { !$0.isTerminated }) && Date() < forceDeadline {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            }
             if applications.allSatisfy(\.isTerminated) { try? fm.removeItem(at: root) }
         }
         try AppUpdate.run("/usr/bin/ditto", [Bundle.main.bundlePath, target.path])
@@ -89,6 +95,10 @@ enum ControllerChecks {
         guard failedHelper.terminationStatus != 0 else { throw AudioFailure("Non-launching app was accepted") }
         try AppUpdate.validate(target, version: BrandArtwork.version)
         guard !fm.fileExists(atPath: failedStage.path) else { throw AudioFailure("Rollback left a stale install stage") }
+        let restoreDeadline = Date().addingTimeInterval(5)
+        while !NSRunningApplication.runningApplications(withBundleIdentifier: AppUpdate.bundleID).contains(where: {
+            $0.bundleURL?.resolvingSymlinksInPath().standardizedFileURL.path == target.path
+        }) && Date() < restoreDeadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
         print("PASS: a validly signed newer app that exits at startup rolls back to the previous working version")
     }
 
