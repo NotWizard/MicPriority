@@ -7,18 +7,45 @@ import SwiftUI
 @MainActor
 enum Launcher {
     static func main() {
+        if CommandLine.arguments.contains("--finish-update") {
+            do { try UpdateInstaller.finish(CommandLine.arguments) }
+            catch {
+                FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
+                exit(1)
+            }
+            return
+        }
+        if CommandLine.arguments.contains("--check-updates") {
+            Task {
+                do {
+                    let release = try await AppUpdate.latest()
+                    print("Current: \(BrandArtwork.version); latest: \(release.tag); newer: \(try release.newer(than: BrandArtwork.version))")
+                    if CommandLine.arguments.contains("--verify-update-download") {
+                        let app = try await AppUpdate.prepare(release)
+                        defer { try? FileManager.default.removeItem(at: app.deletingLastPathComponent()) }
+                        print("PASS: GitHub download, digest, bundle identity, version, signature and Apple Silicon slice")
+                    }
+                    exit(0)
+                } catch {
+                    FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
+                    exit(1)
+                }
+            }
+            dispatchMain()
+        }
         if CommandLine.arguments.contains("--list-inputs") {
             listInputs()
             return
         }
-        if CommandLine.arguments.contains("--check-controller") || CommandLine.arguments.contains("--check-dji-flow") || CommandLine.arguments.contains("--check-miremote-flow") {
+        if CommandLine.arguments.contains("--check-controller") || CommandLine.arguments.contains("--check-dji-flow") || CommandLine.arguments.contains("--check-miremote-flow") || CommandLine.arguments.contains("--check-update-installer") {
             do {
                 let identifier = Bundle.main.bundleIdentifier ?? "com.local.MicPriority"
                 guard !NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
                     .contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) else {
                     throw AudioFailure("请先退出正在运行的 MicPriority，再执行实际切换检查")
                 }
-                if CommandLine.arguments.contains("--check-miremote-flow") { try ControllerChecks.runMiRemote() }
+                if CommandLine.arguments.contains("--check-update-installer") { try ControllerChecks.runUpdater() }
+                else if CommandLine.arguments.contains("--check-miremote-flow") { try ControllerChecks.runMiRemote() }
                 else if CommandLine.arguments.contains("--check-dji-flow") { try ControllerChecks.runDJI() }
                 else { try ControllerChecks.run() }
             }
@@ -41,6 +68,16 @@ enum Launcher {
             .first(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) {
             other.activate(options: [])
             return
+        }
+        if CommandLine.arguments.contains("--update-failed") {
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "更新未完成"
+                alert.informativeText = "请在“更多 → 检查更新”中重试，或到项目发布页手动下载安装。"
+                alert.addButton(withTitle: "知道了")
+                NSApp.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
         }
         MicPriorityApplication.main()
     }
@@ -98,7 +135,7 @@ enum Launcher {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.02))
             }
             guard controller.snapshotAvailable else { throw AudioFailure("No live snapshot for preview") }
-            let view = NSHostingView(rootView: InputMenuView(controller: controller)
+            let view = NSHostingView(rootView: InputMenuView(controller: controller, updater: AppUpdater())
                 .background(Color(nsColor: .windowBackgroundColor)))
             let window = NSWindow(contentRect: NSRect(x: -2000, y: -2000, width: 340, height: 500),
                                   styleMask: [.borderless], backing: .buffered, defer: false)
@@ -131,10 +168,11 @@ enum Launcher {
 @MainActor
 struct MicPriorityApplication: App {
     @StateObject private var controller = InputController()
+    @StateObject private var updater = AppUpdater()
 
     var body: some Scene {
         MenuBarExtra {
-            InputMenuView(controller: controller)
+            InputMenuView(controller: controller, updater: updater)
         } label: {
             Image(nsImage: BrandArtwork.menuIcon)
                 .frame(width: 16, height: 18)

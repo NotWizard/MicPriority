@@ -3,14 +3,9 @@ set -euo pipefail
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$project_root"
 configuration="${1:-release}"
-case "$configuration" in debug|release) ;; *) echo "Usage: $0 [debug|release] [native|universal]" >&2; exit 2 ;; esac
-architecture="${2:-native}"
-build_arguments=(-c "$configuration")
-case "$architecture" in
-    native) ;;
-    universal) build_arguments+=(--arch arm64 --arch x86_64) ;;
-    *) echo "Architecture must be native or universal" >&2; exit 2 ;;
-esac
+if [ "$#" -gt 1 ]; then echo "Usage: $0 [debug|release] (Apple Silicon only)" >&2; exit 2; fi
+case "$configuration" in debug|release) ;; *) echo "Usage: $0 [debug|release]" >&2; exit 2 ;; esac
+build_arguments=(-c "$configuration" --arch arm64)
 swift build "${build_arguments[@]}" --product MicPriority
 binary_dir="$(swift build "${build_arguments[@]}" --show-bin-path)"
 app_path="$project_root/dist/MicPriority.app"

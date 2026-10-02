@@ -2,7 +2,7 @@
 
 ## Platform
 
-Native macOS, macOS 13 or later.
+Native macOS, macOS 13 or later, Apple Silicon only.
 
 ## Stack
 
@@ -18,7 +18,7 @@ Select the highest-priority available system input and keep disconnected devices
 
 ## Capabilities and Constraints
 
-Ordered device membership, automatic fallback, stable recovery, temporary selection, pause, persisted preferences, and optional login launch. First launch is read-only until the user adds devices and enables management. The tool manages system default input; per-app fixed routes remain a limitation. DJI v2 receiver status and the MiRemoteV Xiaomi Bluetooth source have dedicated availability checks.
+Ordered device membership, automatic fallback, stable recovery, temporary selection, pause, persisted preferences, and optional login launch, and user-initiated GitHub release updates. First launch is read-only until the user adds devices and enables management. The tool manages system default input; per-app fixed routes remain a limitation. DJI v2 receiver status and the MiRemoteV Xiaomi Bluetooth source have dedicated availability checks.
 
 ## Product Principles
 

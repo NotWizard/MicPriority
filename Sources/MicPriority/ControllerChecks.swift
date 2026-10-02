@@ -5,6 +5,93 @@ import MicPriorityCore
 // A real controller/HAL flow check. It uses an isolated preferences suite and restores the input.
 @MainActor
 enum ControllerChecks {
+    static func runUpdater() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("MicPriority-installer-check-\(UUID().uuidString)")
+        try fm.createDirectory(at: root, withIntermediateDirectories: false)
+        let target = root.appendingPathComponent("Installed app with spaces.app")
+        defer {
+            let applications = NSRunningApplication.runningApplications(withBundleIdentifier: AppUpdate.bundleID)
+                .filter { $0.bundleURL?.resolvingSymlinksInPath().standardizedFileURL.path == target.path }
+            applications.forEach { $0.terminate() }
+            let deadline = Date().addingTimeInterval(5)
+            while applications.contains(where: { !$0.isTerminated }) && Date() < deadline {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            }
+            if applications.allSatisfy(\.isTerminated) { try? fm.removeItem(at: root) }
+        }
+        try AppUpdate.run("/usr/bin/ditto", [Bundle.main.bundlePath, target.path])
+        let plist = target.appendingPathComponent("Contents/Info.plist")
+        var info = try PropertyListSerialization.propertyList(from: Data(contentsOf: plist), format: nil) as! [String: Any]
+        info["CFBundleShortVersionString"] = "0.2.9"
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0).write(to: plist)
+        try AppUpdate.run("/usr/bin/codesign", ["--force", "--sign", "-", "--options", "runtime", target.path])
+        let preferences = UserDefaults.standard.data(forKey: "inputPreferences")
+        let stage = try AppUpdate.stage(Bundle.main.bundleURL, target: target, version: BrandArtwork.version)
+        let parent = Process()
+        parent.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        parent.arguments = ["60"]
+        try parent.run()
+        defer { if parent.isRunning { parent.terminate() } }
+        let helper = Process()
+        helper.executableURL = stage.appendingPathComponent("installer")
+        helper.arguments = ["--finish-update", String(parent.processIdentifier), target.path, stage.path, BrandArtwork.version]
+        try helper.run()
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        try AppUpdate.validate(target, version: "0.2.9")
+        guard helper.isRunning else { throw AudioFailure("Installer exited before its parent") }
+        parent.terminate()
+        parent.waitUntilExit()
+        let deadline = Date().addingTimeInterval(30)
+        while helper.isRunning && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+        guard !helper.isRunning else { helper.terminate(); throw AudioFailure("Installer lifecycle timed out") }
+        guard helper.terminationStatus == 0 else { throw AudioFailure("Installer helper failed") }
+        try AppUpdate.validate(target, version: BrandArtwork.version)
+        guard !fm.fileExists(atPath: stage.path),
+              NSRunningApplication.runningApplications(withBundleIdentifier: AppUpdate.bundleID).contains(where: {
+                  $0.bundleURL?.resolvingSymlinksInPath().standardizedFileURL.path == target.path && $0.isFinishedLaunching && !$0.isTerminated
+              }) else { throw AudioFailure("Updated app did not launch or installer did not clean up") }
+        UserDefaults.standard.synchronize()
+        guard preferences == UserDefaults.standard.data(forKey: "inputPreferences") else {
+            throw AudioFailure("Installer changed normal microphone preferences")
+        }
+        print("PASS: real helper waits for parent exit, installs, confirms app relaunch, preserves preferences and cleans up")
+
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: AppUpdate.bundleID)
+            .filter { $0.bundleURL?.resolvingSymlinksInPath().standardizedFileURL.path == target.path }
+        running.forEach { $0.terminate() }
+        let stopDeadline = Date().addingTimeInterval(5)
+        while running.contains(where: { !$0.isTerminated }) && Date() < stopDeadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        guard running.allSatisfy(\.isTerminated) else { throw AudioFailure("Test app did not exit") }
+        let broken = root.appendingPathComponent("Broken newer.app")
+        try AppUpdate.run("/usr/bin/ditto", [Bundle.main.bundlePath, broken.path])
+        let brokenInfo = broken.appendingPathComponent("Contents/Info.plist")
+        let versionParts = BrandArtwork.version.split(separator: ".").map { Int($0)! }
+        let failingVersion = "\(versionParts[0]).\(versionParts[1]).\(versionParts[2] + 1)"
+        info["CFBundleShortVersionString"] = failingVersion
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0).write(to: brokenInfo)
+        let stub = root.appendingPathComponent("exit.c")
+        try Data("int main(void) { return 1; }\n".utf8).write(to: stub)
+        try fm.removeItem(at: broken.appendingPathComponent("Contents/MacOS/MicPriority"))
+        try AppUpdate.run("/usr/bin/xcrun", ["clang", "-arch", "arm64", "-mmacosx-version-min=13.0", stub.path,
+                                           "-o", broken.appendingPathComponent("Contents/MacOS/MicPriority").path])
+        try AppUpdate.run("/usr/bin/codesign", ["--force", "--sign", "-", "--options", "runtime", broken.path])
+        let failedStage = try AppUpdate.stage(broken, target: target, version: failingVersion)
+        let failedHelper = Process()
+        failedHelper.executableURL = failedStage.appendingPathComponent("installer")
+        failedHelper.arguments = ["--finish-update", String(parent.processIdentifier), target.path, failedStage.path, failingVersion]
+        try failedHelper.run()
+        let failureDeadline = Date().addingTimeInterval(30)
+        while failedHelper.isRunning && Date() < failureDeadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+        guard !failedHelper.isRunning else { failedHelper.terminate(); throw AudioFailure("Rollback lifecycle timed out") }
+        guard failedHelper.terminationStatus != 0 else { throw AudioFailure("Non-launching app was accepted") }
+        try AppUpdate.validate(target, version: BrandArtwork.version)
+        guard !fm.fileExists(atPath: failedStage.path) else { throw AudioFailure("Rollback left a stale install stage") }
+        print("PASS: a validly signed newer app that exits at startup rolls back to the previous working version")
+    }
+
     static func run() throws {
         NSApplication.shared.setActivationPolicy(.prohibited)
         guard BrandArtwork.menuIcon.isTemplate, BrandArtwork.menuIcon.size.height == 18,

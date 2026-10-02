@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/NotWizard/MicPriority/releases/latest"><img src="https://img.shields.io/github/v/release/NotWizard/MicPriority?style=flat-square&label=Release&color=56856d" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-343e38?style=flat-square&logo=apple&logoColor=white" alt="macOS 13 or later">
-  <img src="https://img.shields.io/badge/Architecture-Universal-56856d?style=flat-square" alt="Apple Silicon and Intel">
+  <img src="https://img.shields.io/badge/Architecture-Apple%20Silicon-56856d?style=flat-square" alt="Apple Silicon only">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/NotWizard/MicPriority?style=flat-square&color=56856d" alt="MIT license"></a>
 </p>
 
@@ -21,21 +21,29 @@ The transmitter gets turned off and back on, while its receiver often stays plug
 
 ## Download and install
 
-**[Download the latest release](https://github.com/NotWizard/MicPriority/releases/latest)** · macOS 13 or later.
+**[Download the latest release](https://github.com/NotWizard/MicPriority/releases/latest)** · macOS 13 or later, **Apple Silicon (M-series) only**.
 
-1. Download and extract `MicPriority-0.2.1-macOS-universal.zip`.
+1. Download and extract `MicPriority-0.3.0-macOS-apple-silicon.zip`.
 2. Move `MicPriority.app` to Applications and open it.
 3. Click the P microphone icon in the menu bar to configure your priorities.
 
-> This first public release uses an ad-hoc local signature and is not notarized by Apple. macOS may block the first launch. Only if you trust the download source, follow [Apple’s instructions](https://support.apple.com/102445): try opening the app, then use System Settings → Privacy & Security → Open Anyway. You do not need to disable system security protections.
+> This release uses an ad-hoc local signature and is not notarized by Apple. macOS may block the first launch. Only if you trust the download source, follow [Apple’s instructions](https://support.apple.com/102445): try opening the app, then use System Settings → Privacy & Security → Open Anyway. You do not need to disable system security protections.
 
-The download contains Apple Silicon and Intel binaries. Hardware verification currently uses Apple Silicon. The Intel build has been produced but has not been tested on a physical Intel Mac.
+Starting with v0.3.0, builds, downloads and in-app updates target Apple Silicon only.
+
+## Check for updates
+
+Choose “更多 → 检查更新…” to check the latest stable GitHub Release. If an update is available, select “下载更新”, then “安装并重启” after the download and verification finish. Your priorities and settings are preserved. Cancelling or a failed download or verification leaves the current app in place.
+
+Keep the app in a writable local folder, preferably Applications. If its location cannot be updated, the app explains why and offers a link to the release page for manual installation. Checks only happen when you request them.
+
+v0.2.1 has no update menu. Install v0.3.0 or later manually once to enable future in-app updates.
 
 ## Screenshot
 
 <p align="center"><img src="docs/assets/screenshot-macos.png" width="360" alt="The actual MicPriority menu bar popover showing four ranked inputs and the current-input badge"></p>
 
-Captured from the current app running on a real Mac, with its actual device order and system input state. The app interface currently uses Chinese.
+Captured from the app running on a real Mac, with its actual device order and system input state. Update checking is in the “更多” menu. The app interface currently uses Chinese.
 
 ## How to use it
 
@@ -56,6 +64,14 @@ Automatic routing starts disabled. Meeting and recording apps should use **Syste
 
 ## Supported inputs
 
+### Xiaomi remotes and SayAll
+
+[SayAll](https://github.com/HD838A/remote-mic-app) is a separate project that turns compatible Xiaomi Bluetooth voice remotes into wireless microphones for the Mac, delivering audio through the `MiRemoteV 2ch` virtual input. Set up and connect your remote in SayAll first, then add that input to your MicPriority list.
+
+The virtual input can remain listed in macOS even after the remote disconnects. MicPriority supports this setup by checking the remote’s Bluetooth connection and whether SayAll is running. Another microphone takes over when the source disconnects, and the preferred input returns after stable recovery. SayAll and its audio plugin are installed separately; neither is bundled with MicPriority.
+
+### Availability rules
+
 | Input | Availability rule and boundary |
 |---|---|
 | General microphones | System-reported availability and input capability |
@@ -71,7 +87,7 @@ Automatic routing starts disabled. Meeting and recording apps should use **Syste
 
 ## Privacy
 
-No microphone audio capture and no device-identity uploads. Device UIDs and Xiaomi Bluetooth identities stay in local settings for stable matching; copied diagnostics use UID hashes. If macOS asks for Bluetooth permission, it is for connection metadata, not pairing or reconnecting devices.
+No microphone audio capture and no device-identity uploads. User-initiated update checks and downloads contact GitHub without sending device lists or microphone settings. Device UIDs and Xiaomi Bluetooth identities stay in local settings for stable matching; copied diagnostics use UID hashes. If macOS asks for Bluetooth permission, it is for connection metadata, not pairing or reconnecting devices.
 
 ## Build from source
 
@@ -84,11 +100,7 @@ cd MicPriority
 open dist/MicPriority.app
 ```
 
-To produce a universal app for both architectures:
-
-```sh
-./scripts/build.sh release universal
-```
+The build script produces an Apple Silicon (arm64) app only.
 
 The script generates the menu bar vector PDF and App icons, then validates the local signature. The public package is not notarized. Maintainers with a Developer ID can set `MIC_PRIORITY_SIGN_IDENTITY` and complete notarization separately.
 

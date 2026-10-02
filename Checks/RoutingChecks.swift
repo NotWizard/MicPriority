@@ -9,6 +9,7 @@ private func mustThrow(_ action: () throws -> Void) {
 @main
 enum RoutingChecks {
     static func main() async throws {
+        try checkUpdates()
         checkMiRemoteStatus()
         checkDJIStatus()
         let now = Date(timeIntervalSince1970: 1000)

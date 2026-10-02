@@ -4,6 +4,7 @@ import SwiftUI
 
 struct InputMenuView: View {
     @ObservedObject var controller: InputController
+    @ObservedObject var updater: AppUpdater
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -85,12 +86,21 @@ struct InputMenuView: View {
                         Button("备份并重置配置", action: controller.resetConfiguration)
                     }
                     Divider()
+                    Button("检查更新…", action: updater.check).disabled(updater.isBusy)
                     Button("使用说明…", action: showHelp)
                     Button("关于 MicPriority…", action: BrandArtwork.showAbout)
                     Divider()
                     Button("退出 MicPriority") { NSApp.terminate(nil) }.keyboardShortcut("q")
                 }.menuStyle(.borderlessButton).fixedSize().controlSize(.small)
             }.padding(16)
+            if updater.isBusy {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(updater.status).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("取消", action: updater.cancel).controlSize(.small)
+                }.padding(.horizontal, 16).padding(.bottom, 12)
+            }
             if controller.loginStatus == .requiresApproval {
                 Button("登录启动等待系统批准 · 打开设置", action: controller.openLoginSettings)
                     .buttonStyle(.link).font(.caption)

@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/NotWizard/MicPriority/releases/latest"><img src="https://img.shields.io/github/v/release/NotWizard/MicPriority?style=flat-square&label=Release&color=56856d" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-343e38?style=flat-square&logo=apple&logoColor=white" alt="macOS 13 or later">
-  <img src="https://img.shields.io/badge/Architecture-Universal-56856d?style=flat-square" alt="Apple Silicon and Intel">
+  <img src="https://img.shields.io/badge/Architecture-Apple%20Silicon-56856d?style=flat-square" alt="Apple Silicon only">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/NotWizard/MicPriority?style=flat-square&color=56856d" alt="MIT license"></a>
 </p>
 
@@ -21,21 +21,29 @@ MicPriority 最初来自 AI coding 和 vibe coding 中一个反复出现的小�
 
 ## 下载与安装
 
-**[下载最新版](https://github.com/NotWizard/MicPriority/releases/latest)** · macOS 13 或更新版本。
+**[下载最新版](https://github.com/NotWizard/MicPriority/releases/latest)** · macOS 13 或更新版本，**仅支持 Apple Silicon（M 系列芯片）**。
 
-1. 下载 `MicPriority-0.2.1-macOS-universal.zip` 并解压。
+1. 下载 `MicPriority-0.3.0-macOS-apple-silicon.zip` 并解压。
 2. 将 `MicPriority.app` 移到“应用程序”，然后打开。
 3. 菜单栏出现 P 麦克风图标，点击即可开始设置。
 
-> 首次公开版采用 ad-hoc 本机签名，尚未完成 Apple 公证。首次打开可能被系统阻止。只有在确认下载来源可信时，才按 [Apple 的打开说明](https://support.apple.com/102445)，到“系统设置 → 隐私与安全性”中选择“仍要打开”。无需关闭系统安全保护。
+> 当前版本采用 ad-hoc 本机签名，尚未完成 Apple 公证。首次打开可能被系统阻止。只有在确认下载来源可信时，才按 [Apple 的打开说明](https://support.apple.com/102445)，到“系统设置 → 隐私与安全性”中选择“仍要打开”。无需关闭系统安全保护。
 
-安装包同时包含 Apple Silicon 和 Intel 两种架构。当前实机验证使用 Apple Silicon；Intel 已完成构建，尚未在 Intel Mac 上验证。
+从 v0.3.0 起，构建、分发和应用内更新均只面向 Apple Silicon。
+
+## 检查更新
+
+在“更多 → 检查更新…”中检查 GitHub 最新正式 Release。发现新版本后选择“下载更新”，下载与校验完成后点击“安装并重启”。现有优先级和设置会保留；取消、下载失败或校验失败不会替换当前应用。
+
+需要将应用放在可写的本地目录，建议使用“应用程序”。若当前位置无法更新，界面会提示原因并提供发布页入口，可手动下载安装。检查更新只在你主动点击时进行。
+
+v0.2.1 没有更新入口，需要先手动安装一次 v0.3.0 或更新版本，之后即可使用应用内更新。
 
 ## 软件截图
 
 <p align="center"><img src="docs/assets/screenshot-macos.png" width="360" alt="MicPriority 实际运行的菜单栏浮窗，显示四个输入的优先级和当前输入标记"></p>
 
-这张截图来自当前版本在真实 Mac 上运行的浮窗，保留了实际设备顺序与系统输入状态。
+这张截图来自真实 Mac 上运行的浮窗，保留了实际设备顺序与系统输入状态。检查更新入口位于“更多”菜单内。
 
 ## 使用方式
 
@@ -56,6 +64,14 @@ MicPriority 最初来自 AI coding 和 vibe coding 中一个反复出现的小�
 
 ## 设备支持
 
+### 小米遥控器与 SayAll
+
+[SayAll（无线麦）](https://github.com/HD838A/remote-mic-app) 是一个独立项目，可把兼容的小米蓝牙语音遥控器变成 Mac 可使用的无线麦克风，并通过 `MiRemoteV 2ch` 虚拟音频输入提供声音。先在 SayAll 中完成安装和连接，就能把这一路输入加入 MicPriority 的优先级。
+
+这个场景的特殊之处是：遥控器蓝牙断开了，`MiRemoteV 2ch` 仍可能留在系统输入列表里。MicPriority 为此做了兼容，结合遥控器连接状态与 SayAll 是否运行判断可用性，断开时自动让下一支麦克风接替，恢复稳定后再切回。SayAll 需要单独安装，MicPriority 不包含它或其音频插件。
+
+### 可用性判断
+
 | 输入类型 | 判断方式与支持边界 |
 |---|---|
 | 通用麦克风 | 使用系统报告的设备可用状态与输入能力 |
@@ -71,7 +87,7 @@ MicPriority 最初来自 AI coding 和 vibe coding 中一个反复出现的小�
 
 ## 隐私
 
-不采集麦克风音频，不上传设备身份。设备 UID 与小米蓝牙身份仅保存在本地，用于稳定匹配；复制诊断时只显示 UID 摘要。如果 macOS 请求蓝牙权限，这是用于读取连接状态，不用于主动配对或重连。
+不采集麦克风音频，不上传设备身份。主动检查或下载更新时会连接 GitHub，不发送设备列表或麦克风配置。设备 UID 与小米蓝牙身份仅保存在本地，用于稳定匹配；复制诊断时只显示 UID 摘要。如果 macOS 请求蓝牙权限，这是用于读取连接状态，不用于主动配对或重连。
 
 ## 从源码构建
 
@@ -84,11 +100,7 @@ cd MicPriority
 open dist/MicPriority.app
 ```
 
-构建当前 Mac 的架构；构建两种架构的通用应用：
-
-```sh
-./scripts/build.sh release universal
-```
+构建脚本只生成 Apple Silicon（arm64）应用。
 
 构建脚本自动生成菜单栏矢量 PDF 与完整 App 图标，并验证本机签名。公开安装包没有 Apple 公证；有 Developer ID 的维护者可通过 `MIC_PRIORITY_SIGN_IDENTITY` 指定已有签名身份，并另行完成公证。
 
