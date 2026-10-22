@@ -17,7 +17,7 @@ MicPriority began with a recurring frustration during AI coding and vibe coding.
 
 The transmitter gets turned off and back on, while its receiver often stays plugged into the Mac. Even with the transmitter off, macOS may keep the receiver selected as its input. The next time you start speaking, nothing comes through, so you have to open sound settings and switch microphones manually. Turning the microphone back on can mean another trip to those settings.
 
-**MicPriority exists to remove that repeated interruption.** Set your preferred input order once, let an available microphone take over, and return when your preferred microphone recovers, so you can stay focused on explaining ideas and writing code. For a receiver that remains online while its transmitter is disconnected, dedicated support currently covers the DJI and Xiaomi remote setups listed below.
+**MicPriority exists to remove that repeated interruption.** Set your preferred input order once, let an available microphone take over, and return when your preferred microphone recovers, so you can stay focused on explaining ideas and writing code. For a receiver that remains online while its transmitter is disconnected, dedicated support currently covers the DJI, Hollyland (MOMA) and Xiaomi remote setups listed below.
 
 ## Download and install
 
@@ -64,11 +64,17 @@ Automatic routing starts disabled. Meeting and recording apps should use **Syste
 
 ## Supported inputs
 
+Beyond ordinary microphones, MicPriority recognises three cases where the receiver is still listed but its audio source is gone: DJI receivers, Hollyland / MOMA receivers, and Xiaomi remotes through SayAll. Each rule is described below.
+
 ### Xiaomi remotes and SayAll
 
 [SayAll](https://github.com/HD838A/remote-mic-app) is a separate project that turns compatible Xiaomi Bluetooth voice remotes into wireless microphones for the Mac, delivering audio through the `MiRemoteV 2ch` virtual input. Set up and connect your remote in SayAll first, then add that input to your MicPriority list.
 
 The virtual input can remain listed in macOS even after the remote disconnects. MicPriority supports this setup by checking the remote’s Bluetooth connection and whether SayAll is running. Another microphone takes over when the source disconnects, and the preferred input returns after stable recovery. SayAll and its audio plugin are installed separately; neither is bundled with MicPriority.
+
+### Hollyland / MOMA receivers
+
+MOMA is Hollyland's brand for the Chinese market. A LARK-series USB receiver stays listed as an input even after every transmitter is switched off, so macOS keeps offering a microphone that captures nothing. MicPriority reads the receiver's own vendor HID status channel for the per-transmitter link flags and battery levels, sending only a read-only heartbeat and no setter commands. The receiver is skipped while no transmitter is linked and returns once one is back.
 
 ### Availability rules
 
@@ -76,11 +82,14 @@ The virtual input can remain listed in macOS even after the remote disconnects. 
 |---|---|
 | General microphones | System-reported availability and input capability |
 | DJI Mic Mini / Mic Mini 2 receiver | Compatible v2 status protocol; skip the receiver when no usable transmitter is linked. Physical verification currently covers DJI Mic Mini 2 |
+| Hollyland / MOMA receiver (LARK series) | Transmitter link flags from the vendor HID heartbeat; the receiver is skipped when every transmitter is disconnected. Physical verification currently covers `3547:0411` |
 | MiRemoteV 2ch + Xiaomi remote + SayAll | Bound remote Bluetooth connection and SayAll running state; the virtual input remains listed in macOS after disconnection but is skipped by MicPriority |
 
 **Mute, quiet audio and pauses in speech do not trigger switching.**
 
 - An unreadable DJI status or more than two seconds without valid updates makes the receiver temporarily unavailable. Other firmware is not guaranteed compatible.
+- The Hollyland heartbeat is also skipped after two seconds without a valid reply. A receiver that never answers, for example on a different control protocol, is left to the system's own judgement instead of being hidden.
+- Hollyland verification covers a two-transmitter layout. Four-transmitter models, charging-case pairing state and other firmware are not verified; a HID channel held exclusively by another app reports as unreadable.
 - Initial Xiaomi discovery recognizes `MI RC`, `Xiaomi Bluetooth Remote 2`, `Xiaomi Bluetooth Remote 2 Pro` and “小米蓝牙语音遥控器”. Once the identity is stored locally, later system renaming still matches it. A remote renamed before first discovery needs a supported name restored first.
 - A Bluetooth connection does not prove SayAll’s audio pipeline is healthy. The MiRemoteV rule does not track phone, web or Apple Watch sources.
 - Charging-case behavior, two DJI transmitters, radio range loss, battery depletion and in-session migration in target apps still need their own physical checks.

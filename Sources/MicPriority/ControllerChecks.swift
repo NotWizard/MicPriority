@@ -199,6 +199,14 @@ enum ControllerChecks {
                             disconnectPrompt: "turn DJI transmitter OFF, leave receiver plugged in")
     }
 
+    static func runHollyland() throws {
+        try runWirelessFlow(receiverPrefix: "AppleUSBAudioEngine:Shenzhen Hollyland Technology Co.,Ltd:",
+                            disconnectedIssue: "发射器未连接",
+                            initiallyConnected: !CommandLine.arguments.contains("--start-disconnected") && !CommandLine.arguments.contains("--verify-disconnected"),
+                            connectPrompt: "power the Hollyland/MOMA transmitter ON and wait for it to link",
+                            disconnectPrompt: "power the Hollyland/MOMA transmitter OFF, leave the receiver plugged in")
+    }
+
     static func runMiRemote() throws {
         try runWirelessFlow(receiverPrefix: MiRemoteAvailability.uid,
                             disconnectedIssue: "小米遥控器已断开", initiallyConnected: !CommandLine.arguments.contains("--start-disconnected") && !CommandLine.arguments.contains("--verify-disconnected"),

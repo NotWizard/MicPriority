@@ -12,6 +12,7 @@ enum RoutingChecks {
         try checkUpdates()
         checkMiRemoteStatus()
         checkDJIStatus()
+        checkHollylandStatus()
         let now = Date(timeIntervalSince1970: 1000)
         let a = AudioInput(uid: "A", deviceID: 1, name: "同名麦克风")
         let b = AudioInput(uid: "B", deviceID: 2, name: "同名麦克风")
@@ -203,6 +204,54 @@ enum RoutingChecks {
             automatic: true, temporary: nil, availableSince: [:], excluded: [], now: Date())
         precondition(choice.targetUID == fallback.uid)
         print("PASS: DJI v2 transmitter presence, physical slots, charging, CRC/truncation rejection and fallback")
+    }
+
+    private static func checkHollylandStatus() {
+        func frame(_ payload: [UInt8]) -> [UInt8] {
+            var bytes: [UInt8] = [0x55, 0xBB, 0xDD, 0x10, 0x80,
+                                  UInt8(payload.count >> 8), UInt8(payload.count & 0xff)] + payload
+            bytes += [UInt8](repeating: 0, count: max(0, 64 - bytes.count))
+            return bytes
+        }
+        // Real heartbeat reply captured on this Mac, padded to the 64-byte HID report size.
+        let hex = "55bbdd1080001001005700000003050000000000000400"
+        let chars = Array(hex)
+        let fixture = stride(from: 0, to: chars.count, by: 2).map { UInt8(String(chars[$0...($0 + 1)]), radix: 16)! }
+        let live = Array(fixture.prefix(7 + 16))
+        precondition(HollylandTransmitterStatus.decode(live)?.linked == 1)
+        precondition(HollylandTransmitterStatus.decode(live)?.batteries == [0x57, 0])
+        precondition(HollylandTransmitterStatus.decode(live)?.issue == nil)
+        let both = frame([1, 1, 90, 64, 0, 0, 3, 5, 0])
+        precondition(HollylandTransmitterStatus.decode(both)?.linked == 3)
+        let second = frame([0, 1, 0, 42, 0, 0, 0, 5, 0])
+        precondition(HollylandTransmitterStatus.decode(second)?.linked == 2)
+        let off = frame([0, 0, 0, 0, 0, 0, 0, 5, 0])
+        precondition(HollylandTransmitterStatus.decode(off)?.issue == "发射器未连接")
+        var magic = both; magic[1] = 0xAA
+        precondition(HollylandTransmitterStatus.decode(magic) == nil)
+        var command = both; command[3] = 0x11
+        precondition(HollylandTransmitterStatus.decode(command) == nil)
+        var target = both; target[4] = 0x81
+        precondition(HollylandTransmitterStatus.decode(target) == nil)
+        var flag = both; flag[7] = 2
+        precondition(HollylandTransmitterStatus.decode(flag) == nil)
+        var length = both; length[6] = 0x40
+        precondition(HollylandTransmitterStatus.decode(length) == nil)
+        precondition(HollylandTransmitterStatus.decode(Array(both.prefix(12))) == nil)
+        precondition(HollylandTransmitterStatus.decode(frame([1, 0, 87, 0, 0, 0, 3])) == nil)
+        precondition(HollylandTransmitterStatus.decode([]) == nil)
+        let uid = "AppleUSBAudioEngine:Shenzhen Hollyland Technology Co.,Ltd:Wireless Microphone:G73X2N4F7E7B:3"
+        let key = HollylandAvailability.key(serial: "G73X2N4F7E7B")
+        precondition(HollylandAvailability.matches(uid: uid, key: key))
+        precondition(!HollylandAvailability.matches(uid: uid, key: HollylandAvailability.key(serial: "OTHER")))
+        precondition(!HollylandAvailability.matches(uid: "MiRemoteV2ch_UID", key: key))
+        let receiver = AudioInput(uid: uid, deviceID: 1, name: "Wireless Microphone", issue: "发射器未连接")
+        let fallback = AudioInput(uid: "BuiltIn", deviceID: 2, name: "Built-in")
+        let choice = RoutingPolicy.choose(priorities: [receiver.uid, fallback.uid],
+            snapshot: AudioSnapshot(inputs: [receiver, fallback], defaultUID: receiver.uid),
+            automatic: true, temporary: nil, availableSince: [:], excluded: [], now: Date())
+        precondition(choice.targetUID == fallback.uid)
+        print("PASS: Hollyland/MOMA heartbeat flags, battery, framing rejection, serial UID match and fallback")
     }
 
     private static func waitFor(_ uid: String, in changes: AsyncStream<AudioSnapshot>) async throws {

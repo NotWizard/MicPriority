@@ -7,6 +7,8 @@
 dist/MicPriority.app/Contents/MacOS/MicPriority --list-inputs
 # 小米遥控器保持断联时，验证误选虚拟输入会被自动纠正
 dist/MicPriority.app/Contents/MacOS/MicPriority --check-miremote-flow --verify-disconnected
+# Hollyland/MOMA 接收器随发射器开关的自动切换检查
+dist/MicPriority.app/Contents/MacOS/MicPriority --check-hollyland-flow
 # 自身视图离屏预览，不是桌面截图
 dist/MicPriority.app/Contents/MacOS/MicPriority --render-preview /absolute/path/panel.png
 ```
@@ -35,5 +37,7 @@ dist/MicPriority.app/Contents/MacOS/MicPriority --check-update-installer
 ```
 
 发布接口：[GitHub Release API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。SayAll 场景来源：[SayAll 项目](https://github.com/HD838A/remote-mic-app)。应用本身不依赖或分发 SayAll 代码。
+
+Hollyland/MOMA 状态通道通过 `IOHIDManager` 读取：厂商用途页 `0xFF90` 的 HID 报告 `0x55`，每 0.5 秒发送一次只读心跳 `55 AA DD 10 40 00 00 27`（补齐 64 字节），响应 `55 BB DD 10 80 LEN_H LEN_L …`，payload 前四位分别为 TX1/TX2 连接标志与电量。协议记录来自 [larkctl](https://github.com/blchinezu/larkctl) 与 [lark-m2-macos](https://github.com/bluecoconut/lark-m2-macos)，没有发送任何设置命令、重启命令或固件操作。
 
 架构检查自 v0.3.1 起使用 macOS [CFBundleCopyExecutableArchitecturesForURL](https://developer.apple.com/documentation/corefoundation/cfbundlecopyexecutablearchitecturesforurl(_:)) 原生 API；运行时不调用 lipo。完整重启检查会对自己的临时测试副本强制清理，以免失败提示框阻止正常退出。

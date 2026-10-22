@@ -12,6 +12,8 @@ public final class AudioDevices: @unchecked Sendable {
     private var miRemoteIssue: String? = "正在检测小米遥控器"
     private let dji = DJIStatusMonitor()
     private var djiStates: [String: String?] = [:]
+    private let hollyland = HollylandStatusMonitor()
+    private var hollylandStates: [String: String?] = [:]
     private let queue = DispatchQueue(label: "MicPriority.CoreAudio")
     private struct Listener {
         let object: AudioObjectID
@@ -43,6 +45,14 @@ public final class AudioDevices: @unchecked Sendable {
                     self.publish(.deviceStateChanged)
                 }
             }
+            self.hollyland.start { [weak self] states in
+                guard let self else { return }
+                self.queue.async {
+                    guard self.callback != nil else { return }
+                    self.hollylandStates = states
+                    self.publish(.deviceStateChanged)
+                }
+            }
             self.publish(.initial)
         }
     }
@@ -51,6 +61,7 @@ public final class AudioDevices: @unchecked Sendable {
         queue.sync {
             // Serialize shutdown after any queued start, so metadata monitors cannot start after stop.
             dji.stop()
+            hollyland.stop()
             miRemote.stop()
             remove(&systemListeners)
             remove(&deviceListeners)
@@ -58,6 +69,7 @@ public final class AudioDevices: @unchecked Sendable {
             miRemoteStarted = false
             miRemoteIssue = "正在检测小米遥控器"
             djiStates.removeAll()
+            hollylandStates.removeAll()
             callback = nil
         }
     }
@@ -180,6 +192,9 @@ public final class AudioDevices: @unchecked Sendable {
             if issue == nil, uid.hasPrefix("AppleUSBAudioEngine:DJI Technology Co., Ltd.:Wireless Mic Rx:") {
                 let matched = djiStates.first { uid.hasPrefix($0.key) }
                 issue = matched.map { $0.value } ?? "正在检测发射器"
+            }
+            if issue == nil, let matched = hollylandStates.first(where: { HollylandAvailability.matches(uid: uid, key: $0.key) }) {
+                issue = matched.value
             }
             if issue == nil, uid == MiRemoteAvailability.uid { issue = miRemoteIssue }
             inputs.append(AudioInput(uid: uid, deviceID: device, name: name,

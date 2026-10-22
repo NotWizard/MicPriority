@@ -37,7 +37,7 @@ enum Launcher {
             listInputs()
             return
         }
-        if CommandLine.arguments.contains("--check-controller") || CommandLine.arguments.contains("--check-dji-flow") || CommandLine.arguments.contains("--check-miremote-flow") || CommandLine.arguments.contains("--check-update-installer") {
+        if CommandLine.arguments.contains("--check-controller") || CommandLine.arguments.contains("--check-dji-flow") || CommandLine.arguments.contains("--check-hollyland-flow") || CommandLine.arguments.contains("--check-miremote-flow") || CommandLine.arguments.contains("--check-update-installer") {
             do {
                 let identifier = Bundle.main.bundleIdentifier ?? "com.local.MicPriority"
                 guard !NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
@@ -47,6 +47,7 @@ enum Launcher {
                 if CommandLine.arguments.contains("--check-update-installer") { try ControllerChecks.runUpdater() }
                 else if CommandLine.arguments.contains("--check-miremote-flow") { try ControllerChecks.runMiRemote() }
                 else if CommandLine.arguments.contains("--check-dji-flow") { try ControllerChecks.runDJI() }
+                else if CommandLine.arguments.contains("--check-hollyland-flow") { try ControllerChecks.runHollyland() }
                 else { try ControllerChecks.run() }
             }
             catch {

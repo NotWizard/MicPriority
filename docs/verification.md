@@ -95,3 +95,25 @@ build.sh 支持 native 与 universal；通用构建包含 arm64 与 x86_64。当
 ## v0.3.1 原生架构检查
 
 架构校验改用 Core Foundation API，真实已签名 Apple Silicon 应用通过；从旧通用包提取 Intel 可执行文件并重新签名的应用被明确拒绝。完整安装重启及新版启动失败后的回退检查再次通过，失败提示框也会在临时测试副本清理时被关闭。
+
+### Hollyland / MOMA USB 接收器（本次）
+
+环境同上。接收器标识为 `3547:0411`（厂商串 `Shenzhen Hollyland Technology Co.,Ltd`，产品串 `Wireless Microphone`），2 通道 48 kHz，音频 UID 前缀为 `AppleUSBAudioEngine:Shenzhen Hollyland Technology Co.,Ltd:Wireless Microphone:`，验证记录不包含序列号。
+
+| 验证项 | 结果 |
+|---|---|
+| USB 接口结构 | HID(0)、UAC Control(1)、UAC Streaming(3)、iAP(7)，与 DJI 的单一厂家端点不同 |
+| HID 报告描述符 | 含厂商用途页 `0xFF90`（Report ID `0x55`，63 字节输入/输出）与 `0xFF82`（Report ID `0x41`），心跳走 `0x55` |
+| 只读心跳 `55 AA DD 10 40 00 00 27` | 有响应：`55 BB DD 10 80 00 10` + 16 字节 payload |
+| payload 解析 | TX1 连接标志 1、TX2 为 0、电量 0x57（87%）；连续采样观察到 88 → 87 → 86 |
+| 发射器关机（用户配合） | 连接标志 1 → 0，电量同时归零；开机后回到 1，电量 85 |
+| 主动上报 | 约 4 分钟被动监听无任何非请求报告，因此必须轮询；当前每 0.5 秒一次 |
+| UAC mute 作为旁路信号 | 发射器开关全程 mute 保持 0，不可用作判断依据 |
+| HID 打开与写入 | `IOHIDDeviceSetReport` 在报告 `0x55` 上返回成功，未抢占接口、未影响音频 |
+| 应用接线 | 隔离探针：输入先显示“正在检测发射器”，首个心跳后转为可用；读取时长为 6 秒 |
+| 完整自动切换流程（`--check-hollyland-flow`） | 通过：连接时选中接收器 → 关闭发射器回退内置输入 → 接收器仍列为输入 → 开机稳定后切回接收器 → 恢复原系统默认输入 |
+| 协议解码检查 | 真实回包、TX1/TX2 组合、错误魔数、错误命令、错误响应目标、越界长度、短 payload 与 UID 序列号匹配全部通过 |
+
+尚未完成：4 发射器机型、其他 PID 与固件、检查过程中物理拔插，以及官方桌面工具独占 HID 时的降级表现。协议只使用只读请求；`0x0C`（重启）、`0x25`（UAC 混音路由）和 `0xFF`（临时产品态）等写命令未被调用。
+
+协议来源：[larkctl](https://github.com/blchinezu/larkctl)、[lark-m2-macos](https://github.com/bluecoconut/lark-m2-macos)。官方没有公开该协议说明。
